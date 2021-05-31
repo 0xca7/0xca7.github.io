@@ -2,7 +2,7 @@
     padding: 0;
     margin: 0;
     box-sizing: border-box;
-    font-family: 'Courier Prime', monospace;
+    font-family: 'VT323', monospace;
     color: greenyellow;
 }
 
@@ -14,11 +14,11 @@ body {
 }
 
 .wrapper {
-    max-width: 500px;
+    max-width: 800px;
     width: 100%;
     margin: auto;
     padding: 20px;
-    background-color: rgb(18, 34, 0);
+    background-color: rgb(8, 15, 0);
     border: 4px solid green;
     margin-bottom: 100px;
 }
@@ -60,26 +60,4 @@ img {
 p {
     text-align: justify;
     text-justify: inter-word;
-}
-
-.container{
-    display: flex;
-    justify-content: space-between;
-}
-
-.mainpage {
-    display:block;
-    list-style-type: none;
-}
-
-.entry {
-    text-indent: 2em;
-}
-
-a:link {
-    color: lightgreen;
-}
-
-a:hover {
-    color: cyan;
 }
