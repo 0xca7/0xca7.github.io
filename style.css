@@ -3,7 +3,6 @@
     margin: 0;
     box-sizing: border-box;
     font-family: 'Courier Prime', monospace;
-    color: greenyellow;
 }
 
 body {
@@ -11,6 +10,7 @@ body {
   margin-top: 150px;
   font-size: 100%;
   background-color: rgb(20, 20, 20);
+  color: greenyellow;
 }
 
 .wrapper {
@@ -76,10 +76,22 @@ p {
     text-indent: 2em;
 }
 
+a:hover, a:visited, a:link, a:active
+{
+    text-decoration: none;
+}
+
+
 a:link {
-    color: lightgreen;
+    color: red;
+}
+
+a:visited {
+    color: red;
+
 }
 
 a:hover {
     color: cyan;
+
 }
