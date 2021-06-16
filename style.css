@@ -95,3 +95,17 @@ a:hover {
     color: cyan;
 
 }
+
+p.cite {
+    max-width: 500px;
+}
+
+emph {
+    color: cyan;
+}
+
+.linklist {
+    max-width: 350px;
+    text-align: left;
+
+}
