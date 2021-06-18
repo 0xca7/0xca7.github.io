@@ -107,5 +107,14 @@ emph {
 .linklist {
     max-width: 350px;
     text-align: left;
+}
 
+.blogmain {
+    max-width: 500px;
+}
+
+.blogbox {
+    text-align: left;
+    max-width:490px;
+    background-color: rgb(23, 43, 0);
 }
