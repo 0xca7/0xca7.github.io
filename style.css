@@ -115,6 +115,7 @@ emph {
 
 .blogbox {
     text-align: left;
-    max-width:490px;
+    padding:10px;
+    max-width:500px;
     background-color: rgb(23, 43, 0);
 }

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>0xca7</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap" rel="stylesheet"> 
+
+    <main>
+
+    <center>
+      <div class="mainpage">
+
+    <h2>Exploring a Router</h2>
+        <pre>
+//=====================================================\\
+        </pre>
+<div class="blogmain">
+<p>
+I got my hand on an old Tilgin HG1311 router recently, so I 
+decided to have some fun with it. I doubt anyone is still using 
+a machine like this, but nevertheless, poking around can't hurt.
+<br> <br>
+</p>
+
+<p>
+Once I took the case off, I had a closer look at the  
+ICs installed on the PCB. Here's a picture:
+
+<img src="imgs/router0.jpg" alt=":(" width="500px">
+</p>
+
+<p>
+The first chip I obtained a datasheet for is the S29GL064N, which is a 
+flash chip. This holds the firmware of the device. The V54C3256164 is a 
+SDRAM. For both of these, datasheets were available. The big BGA chip 
+is an Infineon PSB7300AZDW, which I couldn't obtain any detailed information 
+for, nor a datasheet. I added a picture with the labeled chips below.
+
+<img src="imgs/router1.jpg" alt=":(" width="500px">
+</p>
+
+<p>
+Right away, I assumed that the pin header on the top left of the above 
+image must be the UART connector. To find out what each pin does, I just 
+went ahead and used the V54C3256164 for help. I checked the datasheet for 
+the GND and Vcc pins and then used a multimeter to check which pin of the 
+pin header is GND, I did the same for Vcc. Finding TX and RX (labeled from the
+perspective of the router PCB) was no problem via trial and error. 
+</p>
+<br><br> 
+
+<p>
+Next step was setting up my USB-to-UART connector and powering on the router. 
+I used a CH340 connector, which I hooked up to the router pin header. I connected to 
+the device via the application minicom from my laptop. After powering on the router, 
+I was immediately able to see the boot sequence.
+</p>
+
+<img src="imgs/router2.png" alt=":(" width="500px">
+
+<p>
+After some digging around on the device, I found a file containing some interesting 
+strings, among them "username" and "password". Below you can see the result of grep-ing 
+the file. One of the usernames that turned up was "root". 
+<img src="imgs/router3.png" alt=":(" width="500px">
+</p>
+
+<p>
+Next, I connected to the device via LAN and to log in via:
+</p>
+<div class="blogbox">
+"root"/"ahy9mee2" 
+</div>
+<p>
+The last image shows that I was able to log in to the router web GUI with these credentials :) 
+<img src="imgs/router4.png" alt=":(" width="500px">
+</p>
+
+<p>
+That's it for now! Would be nice to get my hands on the firmware...
+</p>
+<br><br>
+
+</div>
+
+        <pre>
+\\=====================================================//
+        </pre>
+ 
+      </div>
+
+        <a href=../index.html> <= back home</a>
+    </div>
+    </center>
+
+    
+  </main>
+  </body>
+  </html> 
