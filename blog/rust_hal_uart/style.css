@@ -1,0 +1,33 @@
+body {
+    background-color: black;
+    color: rgb(0, 190, 0);
+    text-align: justify;
+}
+
+main {
+    margin: 0 auto;
+    width: 50%;
+    font-family: 'Ubuntu Mono', monospace;
+    font-size: larger;
+}
+
+emph {
+    font-weight: 1500;
+    color: cyan;
+}
+
+img {
+    border: dotted green 1px;
+    padding: 10px;
+    max-width: 100%;
+}
+
+pre.code {
+    max-width: 100%;
+    background-color: black;
+    color: lightgrey;
+    font-family: 'Ubuntu Mono', monospace;
+    padding: 10px;
+    border: dashed green 1px;
+    overflow: auto;
+}
