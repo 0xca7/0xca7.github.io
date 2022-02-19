@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>blog</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&display=swap" rel="stylesheet"> 
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&display=swap" rel="stylesheet"> 
+
+  <main>
+    <h1> Redline Stealer </h1>
+Did this for a course, this is the writeup I submitted there. Thought I'd post it on here, enjoy.
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Short Summary </h2>
+<emph>Malware Name:<br>Redline Stealer</emph><br> <br>
+<emph>Sample Hash:<br>d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85</emph> <br> <br>
+<emph>URL: <br> https://bazaar.abuse.ch/sample/d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85</emph> <br> <br>
+<br>
+This report summarizes the findings regarding the Redline Stealer sample with the above SHA256 hash. Redline Stealer is an information stealer, which gathers information about the infected system, for instance saved browser login credentials, system configuration and installed programs among others [1]. The information is then exfiltrated to the attackers in control of the configured C2 server. In the case of this particular sample, an initial stage contains a packed second stage. The initials stage unpacks this second stage, which is the stealer component, to %USER%/AppData/Local/Temp and executes it. As a result, a connection to the C2 is established where the malware sends all collected information after it is obtained from the system. 
+<h2 style="border-bottom: solid 1px green; padding: 3px"> High Level Technical Summary </h2>
+Although the infection vector by which the malware reaches the victim system is not discernable via the given sample alone, past Redline Stealer campaigns have used phishing with a malicious document [2] or disguised the malware as software cracks [3]. In the case of this sample, the exectable with the initial stage unpacks the seconds stage as "fwafafa.exe" to "%USER%/AppData/Local/Temp" and executes it.
+The second stage is Redline Stealer, which exfiltrates the collected information to the attacker IP "65[.]108[.]23[.]98" via port 15871. As the C2 is not active anymore, this can only be ascertained from the static and dynamic analysis of the sample but not be corroborated by a real-world test.
+The below block diagram summarizes the above.
+<br><br><center><img src="_resources/534b2d47be07e78dcc8797892bccfeca.png" alt="oops"></center><br>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Composition  </h2>
+The two parts of the malware are: <br>
+<pre>
+the initial stage SHA256: d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85<br>
+the second stage, Redline Stealer SHA256: f4bf9e7bebb1eb9645a4c15d8575837f586fec95f729359d9b9c550051fcddef<br>
+</pre>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Basic Static Analysis </h2>
+In a first step, the initial stage of the malware is examined. An analysis of the strings contained in the malware provides the following selection of items of interest:
+<pre class="code">
+C:\yoxu\dexu\zamuluku\xekecojezox.pdb
+Vowoyezelu tahuvuputif laje
+VirtualAlloc
+VirtualProtect
+GetProcAddress
+LoadLibraryA
+...
+</pre>
+The two first strings may allow identification of the malware via automated tools, while the function names give clues of its inner workings.
+An initial analysis shows the sample is a PE32 executable, compiled with Microsoft Visual C/C++. Examining the imports, only KERNEL32.dll is imported, however, via GetProcAddress and LoadLibraryA, further components may be loaded at runtime. 
+The entropy shown below and the fact that VirtualProtect / VirtualAlloc are used suggest this executable may contain a further stage which was confirmed in the course of the analysis. The sections do not indicate a standard packer such as UPX is in use, neither do the comparison of raw and virtual section sizes.
+<br><br><center><img src="_resources/e429fdcaf93b596bde96daeb6a9a4025.png" alt="oops"></center><br>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Basic Dynamic Analysis </h2>
+The malware drops the file `fwafafa.exe` to `%USER%\AppData\Local\Temp`. This executable attempts to contact the IP address `65[.]108[.]23[.]98` via port 15871. Wireshark shows the indicator net.tcp://65.108.23.98:15871
+<br><br><center><img src="_resources/b9b940b028607dac657cde893eba6db7.png" alt="oops"></center><br>
+<br><br><center><img src="_resources/3c30a12ae257fa05a9387316deb2e696.png" alt="oops"></center><br>
+<br><br><center><img src="_resources/933a8180dd0cb7a76f45611f66352a78.png" alt="oops"></center><br>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Advanced Static and Dynamic Analysis </h2>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Examination of the Second Stage </h3>
+The unpacked second stage `fwafafa.exe` has a lower overall entropy than the packed initial stage. 
+<br><br><center><img src="_resources/b6b43d282459a8382d63aae1e05d0c75.png" alt="oops"></center><br>
+This already hints at this being the malware's payload. Closer examination reveals this is a .NET PE32 executable, thus it is loaded into dnSpy to perform a deeper analysis.
+Using the debugger to reach the entry point of the application, the first step in execution is the decryption of the configuration shown below.
+<br><br><center><img src="_resources/3a0d8bcb1c0cf5967a695cabfc77211b.png" alt="oops"></center><br>
+Decryption is realized via a simple XOR cipher, in combination with the hard-coded key.
+<br><br><center><img src="_resources/ea77a37248f0bb08e1fb41e96fb0d4ae.png" alt="oops"></center><br>
+The `IP` variable decrypts to `65[.]108[.]23[.]98:15871`. 
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Capabilities </h3>
+This section describes the key capabilities of the information stealer.
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Enumeration of Installed Browsers </h3>
+Browsers are enumerated via the registry, as shown in the below screenshot. The `StartMenuInternet` subkey is where browsers add an entry in order to be displayed as internet clients in the start menu.
+<br><br><center><img src="_resources/d6aa9740c642884432c7b61bc30b3366.png" alt="oops"></center><br>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Enumeration of Installed Programs </h3>
+Installed software is also enumerated via the registry, here the key `SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` is used. The malware authors attempt to make analysis harder by storing the key as a character array. 
+<br><br><center><img src="_resources/1d6dbd36edc18cd974af7fd9ff091775.png" alt="oops"></center><br>
+In a later method, the directories
+- Windows<br>
+- Program Data<br>
+- Program Files<br>
+- Program Files (x86) <br>
+are checked for directories containing the (obfuscated) strings
+- Login Data<br>
+- Web Data<br>
+- Cookies<br>
+<br><br><center><img src="_resources/e4e54640ad7cde76f70258ccd56057f3.png" alt="oops"></center><br>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Enumeration of Antivirus </h3>
+A further method searches for the strings
+<pre class="code">
+AntivirusProduct
+AntiSpywareProduct
+FirewallProduct
+</pre>
+using a `ManagementObjectSearcher` class to enumerate security software installed on the system. This is explained further in [4].
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Stealing Web Browser Data </h3>
+Using the information about the identified browsers, the malware collects login data, autofill information, cookies and targets the string *credit_cards* as well.
+<br><br><center><img src="_resources/86358f702adf0589425d04cbee0a819c.png" alt="oops"></center><br>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Encoded Wallet Names </h3>
+The malware contains a long base64 encoded string (approx. 15k characters) which was decoded using a python script, the resulting strings are shown below.
+<pre class="code">
+ffnbelfdoeiohenkjibnmadjiehjhajb|YoroiWallet
+ibnejdfjmmkpcnlpebklmnkoeoihofec|Tronlink
+jbdaocneiiinmjbjlgalhcelgbejmnid|NiftyWallet
+nkbihfbeogaeaoehlefnkodbefgpgknn|Metamask
+afbcbjpbpfadlkmhmclhkeeodmamcflc|MathWallet
+hnfanknocfeofbddgcijnmhnfnkdnaad|Coinbase
+fhbohimaelbohpjbbldcngcnapndodjp|BinanceChain
+odbfpeeihdkbihmopkbjmoonfanlbfcl|BraveWallet
+hpglfhgfnhbgpjdenjgmdgoeiappafln|GuardaWallet
+blnieiiffboillknjnepogjhkgnoapac|EqualWallet
+cjelfplplebdjjenllpjcblmjkfcffne|JaxxxLiberty
+fihkakfobkmkjojpchpfgcmhfjnmnfpi|BitAppWallet
+kncchdigobghenbbaddojjnnaogfppfj|iWallet
+amkmjjmmflddogmhpjloimipbofnfjih|Wombat
+fhilaheimglignddkjgofkcbgekhenbh|AtomicWallet
+nlbmnnijcnlegkjjpcfjclmcfggfefdm|MewCx
+nanjmdknhkinifnkgdcggcfnhdaammmj|GuildWallet
+nkddgncdjgjfcddamfgcmfnlhccnimig|SaturnWallet
+fnjhmkhhmkbjkkabndcnnogagogbneec|RoninWallet
+aiifbnbfobpmeekipheeijimdpnlpgpp|TerraStation
+fnnegphlobjdpkhecapkijjdkgcjhkib|HarmonyWallet
+aeachknmefphepccionboohckonoeemg|Coin98Wallet
+cgeeodpfagjceefieflmdfphplkenlfk|TonCrystal
+pdadjkfkgcafgbceimcpbkalnfnepbnk|KardiaChain
+bfnaelmomeimhlpmgjnjophhpkkoljpa|Phantom
+fhilaheimglignddkjgofkcbgekhenbh|Oxygen
+mgffkfbidihjpoaomajlbgchddlicgpn|PaliWallet
+aodkkagnadcbobfpggfnjeongemjbjca|BoltX
+kpfopkelmapcoipemfendmdcghnegimn|LiqualityWallet
+hmeobnfnfcmdkdcmlblgagmfpfboieaf|XdefiWallet
+lpfcbjknijpeeillifnkikgncikgfhdo|NamiWallet
+dngmlblcodfobpdpecaadgfbcggfjfnm|MaiarDeFiWallet
+bhghoamapcdpbohphigoooaddinpkbai|Authenticator
+</pre>
+In combination with further enumeration in the Application Data directory, this suggests the stealer also attempts to collect cryptocurrency wallet data.
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Further Points </h3>
+The malware also contains references to the applications:
+- Discord<br>
+- Telegram<br>
+- Filezilla<br>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Exfiltration </h3>
+Exfiltration takes place via port 15871 to the encoded IP address. After a connection to the attacker system is established, the SenderFactory.Create method, shown below, collects all information as described in the previous sections. This data is then sent to the attackers.
+<br><br><center><img src="_resources/aeb7fef982ea5b6def6771831bdc2357.png" alt="oops"></center><br>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> Appendix </h2>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> IOCs </h3>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Host Based IOCs </h3>
+Initial Stage (SHA256 Hash):
+<pre class="code">
+d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85
+</pre>
+Second Stage (Filename and SHA256 Hash):
+<pre class="code">
+fwafafa.exe
+f4bf9e7bebb1eb9645a4c15d8575837f586fec95f729359d9b9c550051fcddef
+</pre>
+<h3 style="border-bottom: solid 1px green; padding: 3px"> Network Based IOCs </h3>
+<pre class="code">
+65.108.23.98:15871
+net.tcp://65.108.23.98:15871
+</pre>
+<h2 style="border-bottom: solid 1px green; padding: 3px"> YARA Rules </h2>
+Rule for Initial Stage
+<pre class="code">
+rule redline_d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85 {
+    meta:
+        last-updated: "2022-02-08"
+        author: "secret"
+        description: "yara rule for Redline Stealer (SHA256:d50203cdee12951fa87f5e2eb1428dde3dedb16257db97ef4ef27201a9267c85)"
+    
+    strings:
+        // $VARNAME = "VALUE" TYPE
+        // add strings from the malware
+        $string1 = "Vowoyezelu tahuvuputif laje" ascii
+        $pdb = "C:\yoxu\dexu\zamuluku\xekecojezox.pdb" ascii
+    condition:
+    
+        // is a PE, so MZ is at position 0 of the file
+        $PE_MAGIC_BYTE at 0 and
+        // AND must contains string1 and string2
+        ($string1 and $pdb)
+}
+</pre>
+--- <br>
+References
+[1] https://malpedia.caad.fkie.fraunhofer.de/details/win.redline_stealer <br> <br>
+[2] https://www.fortinet.com/blog/threat-research/omicron-variant-lure-used-to-distribute-redline-stealer <br> <br>
+[3] https://asec.ahnlab.com/en/30445/ <br> <br>
+[4] https://social.msdn.microsoft.com/Forums/vstudio/en-US/d555f390-dd75-4604-b653-df0a9f4c2fa3/wmi-retrieving-antivirus-product-info-with-wmi-and-c-i-need-help-cant-find-the-solution?forum=csharpgeneral <br><br>
+<br><br><br>
+
+<br><a href="../../blog.html"><= back</a><br>
+
+</main>
+
+
+</body>
+    
