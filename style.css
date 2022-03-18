@@ -1,6 +1,6 @@
 body {
     background-color: black;
-    color: yellowgreen;
+    color: orange;
     font-family: 'Courier Prime', monospace;
 }
 
@@ -8,7 +8,7 @@ main {
     width: 40%;
     margin: 100px auto;
     padding: 10px;
-    border: double 5px yellowgreen;
+    border: double 5px orange;
     border-radius: 5px;
     text-align: justify;
 }
@@ -20,8 +20,14 @@ section.menu {
 }
 
 .column {
+  text-align: left;
   float: left;
   width: 33.33%;
+}
+
+.twocolumn {
+  float: left;
+  width: 48%;
 }
 
 /* Clear floats after the columns */
@@ -33,19 +39,19 @@ section.menu {
 }
 
 emph {
-    color: cyan;
+    color: red;
 }
 
 hr {
-    color:green;
+    color:orange;
 }
 
 a:link {
-color: yellowgreen;
+color: rgb(189, 123, 0);
 text-decoration: none;
 }
 a:visited {
-color: green;
+color: darkred;
 }
 a:hover {
 color: #f8ec45;
