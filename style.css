@@ -1,59 +1,37 @@
 body {
     background-color: black;
-    color: orange;
+    color: greenyellow;
     font-family: 'Courier Prime', monospace;
 }
 
 main {
     width: 40%;
     margin: 100px auto;
-    padding: 10px;
-    border: double 5px orange;
-    border-radius: 5px;
+    padding: 20px;
+    border: solid 2px green;
+    background-color: rgb(6, 12, 0);
     text-align: justify;
 }
 
-section.menu {
-    text-align: justify;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.column {
-  text-align: left;
-  float: left;
-  width: 33.33%;
-}
-
-.twocolumn {
-  float: left;
-  width: 48%;
-}
-
-/* Clear floats after the columns */
-.row:after {
-  content: "";
-  display: table;
-  clear: both;
-  overflow:auto;
+pre {
+    font-size: 1vw;
 }
 
 emph {
-    color: red;
+    color: rgb(255, 0, 0);
 }
 
 hr {
-    color:orange;
+    color:green;
 }
 
 a:link {
-color: rgb(189, 123, 0);
-text-decoration: none;
+    color: greenyellow;
+    text-decoration: none;
 }
 a:visited {
-color: darkred;
+    color: green;
 }
 a:hover {
-color: #f8ec45;
+    color:yellow;
 }
-
