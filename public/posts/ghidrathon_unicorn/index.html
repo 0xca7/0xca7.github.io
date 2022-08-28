@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ghidrathon_unicorn | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="https://github.com/0xca7/">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">YouTube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Ghidrathon_unicorn</span></h1>
+
+<h2 class="date">2022/08/28</h2>
+</div>
+
+<main>
+<h1 id="ghidra-with-ghidrathon--unicorn-engine">Ghidra with Ghidrathon + Unicorn Engine</h1>
+<p>The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.</p>
+<h1 id="my-script">My Script</h1>
+<p>I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3]. What you can do now is mark an area of code to emulate, run my script, choose which registers you want to set if necessary and watch the output instruction-by-instruction.</p>
+<p>Currently, I implemented this only for ARM32 and called it <strong>arm_miniemu</strong>, see it in action:</p>
+<p><img src="/static/arm_miniemu.gif" alt="arm_miniemu"></p>
+<p>For each instruction marked, it produces this output:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-console" data-lang="console"><span style="display:flex;"><span>&gt;&gt;&gt; Tracing instruction at 0x1008, instruction size <span style="color:#f92672">=</span> 0x4
+</span></span><span style="display:flex;"><span>r0:  0x00000000 r1: 0x00000000 r2:  0x00000000 r3: 0x0000001e
+</span></span><span style="display:flex;"><span>r4:  0x00000000 r5: 0x00000000 r6:  0x00000000 r7: 0xdeadbeef
+</span></span><span style="display:flex;"><span>r8:  0x00000000 r9: 0x00000000 r10: 0x00000000 fp: 0x00080000
+</span></span><span style="display:flex;"><span>r12: 0x00000000 sp: 0x00080000 lr:  0x00000000
+</span></span><span style="display:flex;"><span>-------------------------------------------------------------
+</span></span><span style="display:flex;"><span>pc -&gt; 0x00001008
+</span></span><span style="display:flex;"><span>0x4:	sub	r3, fp, #0xc
+</span></span><span style="display:flex;"><span>-------------------------------------------------------------
+</span></span><span style="display:flex;"><span>sp @ 0x00080000
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 1e 00 00 00 00  | sp - 0000
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0010
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0020
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0030
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0040
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0050
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0060
+</span></span><span style="display:flex;"><span>00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  | sp - 0070
+</span></span><span style="display:flex;"><span>=============================================================
+</span></span></code></pre></div><p>Thus you get a mini emulator in ghidra.</p>
+<hr>
+<p>Here&rsquo;s the script:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#75715e"># use unicorn emulator to run code selected in ghidra graphs or listing views</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#@author 0xca7</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#@category Python 3</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#@keybinding </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#@menupath </span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#@toolbar </span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">requires unicorn and capstone to be installed
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> unicorn <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> unicorn.arm_const <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> capstone <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">constants for emulator
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># code starts here</span>
+</span></span><span style="display:flex;"><span>CODE_ADDR <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1000</span>
+</span></span><span style="display:flex;"><span>CODE_SIZE <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x4000</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># stack bottom</span>
+</span></span><span style="display:flex;"><span>STACK_ADDR <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x0007c000</span>
+</span></span><span style="display:flex;"><span>STACK_SIZE <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x00004000</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">constant for code hook
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># number of stack bytes to print</span>
+</span></span><span style="display:flex;"><span>STACK_PRINT_BYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">128</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">hooks the code being executed. displays all registers, the disassembled instruction and stack
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">hook_code</span>(uc, address, size, user_data):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#34;&gt;&gt;&gt; Tracing instruction at 0x</span><span style="color:#e6db74">%x</span><span style="color:#e6db74">, instruction size = 0x</span><span style="color:#e6db74">%x</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">%</span>(address, size))
+</span></span><span style="display:flex;"><span>	
+</span></span><span style="display:flex;"><span>	r0 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R0)
+</span></span><span style="display:flex;"><span>	r1 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R1)
+</span></span><span style="display:flex;"><span>	r2 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R2)
+</span></span><span style="display:flex;"><span>	r3 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R3)
+</span></span><span style="display:flex;"><span>	r4 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R4)
+</span></span><span style="display:flex;"><span>	r5 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R5)
+</span></span><span style="display:flex;"><span>	r6 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R6)
+</span></span><span style="display:flex;"><span>	r7 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R7)
+</span></span><span style="display:flex;"><span>	r8 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R8)
+</span></span><span style="display:flex;"><span>	r9 <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R9)
+</span></span><span style="display:flex;"><span>	r10 <span style="color:#f92672">=</span>  uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R10)
+</span></span><span style="display:flex;"><span>	fp <span style="color:#f92672">=</span>  uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_FP)
+</span></span><span style="display:flex;"><span>	r12 <span style="color:#f92672">=</span>  uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_R12)
+</span></span><span style="display:flex;"><span>	sp <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_SP)
+</span></span><span style="display:flex;"><span>	lr <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_LR)
+</span></span><span style="display:flex;"><span>	pc <span style="color:#f92672">=</span>   uc<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_PC)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r0:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r0), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r1: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r1), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r2:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r2), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r3: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r3))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r4:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r4), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r5: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r5), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r6:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r6), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r7: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r7))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r8:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r8), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r9: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r9), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r10: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r10), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;fp: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(fp))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;r12: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(r12), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;sp: 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(sp), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;lr:  0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(lr))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;-------------------------------------------------------------&#39;</span>)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;pc -&gt; 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(pc))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	code <span style="color:#f92672">=</span> uc<span style="color:#f92672">.</span>mem_read(address, size)
+</span></span><span style="display:flex;"><span>	md <span style="color:#f92672">=</span> Cs(CS_ARCH_ARM, CS_MODE_ARM)
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> md<span style="color:#f92672">.</span>disasm(code, size):
+</span></span><span style="display:flex;"><span>		print(<span style="color:#e6db74">&#34;0x</span><span style="color:#e6db74">%x</span><span style="color:#e6db74">:</span><span style="color:#ae81ff">\t</span><span style="color:#e6db74">%s</span><span style="color:#ae81ff">\t</span><span style="color:#e6db74">%s</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">%</span>(i<span style="color:#f92672">.</span>address, i<span style="color:#f92672">.</span>mnemonic, i<span style="color:#f92672">.</span>op_str))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;-------------------------------------------------------------&#39;</span>)
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e"># print some stack bytes</span>
+</span></span><span style="display:flex;"><span>	sp <span style="color:#f92672">=</span> mu<span style="color:#f92672">.</span>reg_read(UC_ARM_REG_SP)
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;sp @ 0x</span><span style="color:#e6db74">{:08x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(sp))
+</span></span><span style="display:flex;"><span>	stack <span style="color:#f92672">=</span> list(mu<span style="color:#f92672">.</span>mem_read(sp<span style="color:#f92672">-</span>STACK_PRINT_BYTES, STACK_PRINT_BYTES))
+</span></span><span style="display:flex;"><span>	stack<span style="color:#f92672">.</span>reverse()
+</span></span><span style="display:flex;"><span>	lines <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">for</span> (i, byte) <span style="color:#f92672">in</span> enumerate(stack):
+</span></span><span style="display:flex;"><span>		print(<span style="color:#e6db74">&#39;</span><span style="color:#e6db74">{:02x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(byte), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> (i<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>) <span style="color:#f92672">%</span> <span style="color:#ae81ff">16</span> <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+</span></span><span style="display:flex;"><span>			print(<span style="color:#e6db74">&#39; | sp - </span><span style="color:#e6db74">{:04x}</span><span style="color:#e6db74">&#39;</span><span style="color:#f92672">.</span>format(lines <span style="color:#f92672">*</span> <span style="color:#ae81ff">16</span>))
+</span></span><span style="display:flex;"><span>			lines <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	print(<span style="color:#e6db74">&#39;=============================================================</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#39;</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">main part of the script
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>reg_select <span style="color:#f92672">=</span> [
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;r0&#39;</span>, <span style="color:#e6db74">&#39;r1&#39;</span>, <span style="color:#e6db74">&#39;r2&#39;</span>, <span style="color:#e6db74">&#39;r3&#39;</span>, 
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;r4&#39;</span>, <span style="color:#e6db74">&#39;r5&#39;</span>, <span style="color:#e6db74">&#39;r6&#39;</span>, <span style="color:#e6db74">&#39;r7&#39;</span>,
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;r8&#39;</span>, <span style="color:#e6db74">&#39;r9&#39;</span>, <span style="color:#e6db74">&#39;r10&#39;</span>, <span style="color:#e6db74">&#39;fp&#39;</span>,
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">&#39;r12&#39;</span>, <span style="color:#e6db74">&#39;sp&#39;</span>, <span style="color:#e6db74">&#39;lr&#39;</span>, <span style="color:#e6db74">&#39;pc&#39;</span>,
+</span></span><span style="display:flex;"><span>]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># get the addresses from user selection</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>codeStart <span style="color:#f92672">=</span> currentSelection<span style="color:#f92672">.</span>getMinAddress()
+</span></span><span style="display:flex;"><span>codeEnd <span style="color:#f92672">=</span> currentSelection<span style="color:#f92672">.</span>getMaxAddress()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># get the opcodes and data from the area selected</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># this part is stolen from Mandiant :) &lt;3</span>
+</span></span><span style="display:flex;"><span>code <span style="color:#f92672">=</span> bytes(map(<span style="color:#66d9ef">lambda</span> b: b <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>, getBytes(codeStart, codeEnd<span style="color:#f92672">.</span>subtract(codeStart) <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>)))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># ask user which regs should be edited</span>
+</span></span><span style="display:flex;"><span>sel <span style="color:#f92672">=</span> askChoices(<span style="color:#e6db74">&#39;sel&#39;</span>, <span style="color:#e6db74">&#39;Choose registers to set:&#39;</span>, reg_select)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>regs <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># get values for selected registers</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> si <span style="color:#f92672">in</span> sel:
+</span></span><span style="display:flex;"><span>	s <span style="color:#f92672">=</span> askString(si, <span style="color:#e6db74">&#39;enter </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> value&#39;</span><span style="color:#f92672">.</span>format(si))
+</span></span><span style="display:flex;"><span>	regs<span style="color:#f92672">.</span>append((si,int(s, base<span style="color:#f92672">=</span><span style="color:#ae81ff">16</span>)))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># setup the emulator</span>
+</span></span><span style="display:flex;"><span>mu <span style="color:#f92672">=</span> Uc(UC_ARCH_ARM, UC_MODE_ARM)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># setup for the code and stack memory</span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>mem_map(CODE_ADDR, CODE_SIZE)
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>mem_map(STACK_ADDR, STACK_SIZE)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># setup stack</span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_SP, STACK_ADDR<span style="color:#f92672">+</span>STACK_SIZE)
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># setup frame pointer</span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_FP, STACK_ADDR<span style="color:#f92672">+</span>STACK_SIZE)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># write the code to memory</span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>mem_write(CODE_ADDR, code)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># trace execution</span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>hook_add(UC_HOOK_CODE, hook_code, begin<span style="color:#f92672">=</span>CODE_ADDR, end<span style="color:#f92672">=</span>CODE_ADDR<span style="color:#f92672">+</span>len(code))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># setup registers, write user supplied values to them</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">for</span> reg <span style="color:#f92672">in</span> regs:
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r0&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R0, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r1&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R1, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r2&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R2, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r3&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R3, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r4&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R4, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r5&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R5, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r6&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R6, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r7&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R7, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r8&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R8, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r9&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R9, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r10&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R10, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;fp&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_FP, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;r12&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_R12, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;sp&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_SP, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;lr&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_LR, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> reg[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;pc&#39;</span>:
+</span></span><span style="display:flex;"><span>		mu<span style="color:#f92672">.</span>reg_write(UC_ARM_REG_PC, reg[<span style="color:#ae81ff">1</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>mu<span style="color:#f92672">.</span>emu_start(CODE_ADDR, CODE_ADDR <span style="color:#f92672">+</span> len(code))
+</span></span></code></pre></div><h1 id="conclusion">Conclusion</h1>
+<p>Yeah, it&rsquo;s a work in progress, but I&rsquo;m only getting into Ghidra scripting :)</p>
+<h1 id="references">References</h1>
+<p>[1] <a href="https://www.mandiant.com/resources/blog/ghidrathon-snaking-ghidra-python-3-scripting">https://www.mandiant.com/resources/blog/ghidrathon-snaking-ghidra-python-3-scripting</a></p>
+<p>[2] <a href="https://www.unicorn-engine.org/">https://www.unicorn-engine.org/</a></p>
+<p>[3] <a href="https://www.capstone-engine.org/">https://www.capstone-engine.org/</a></p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+
