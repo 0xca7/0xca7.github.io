@@ -1,5 +1,5 @@
 ---
-title: "Ghidrathon_unicorn"
+title: "Ghidrathon + Unicorn Engine + Capstone"
 date: 2022-08-28T19:32:42+02:00
 draft: false
 ---

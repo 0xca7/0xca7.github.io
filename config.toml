@@ -8,5 +8,5 @@ theme = "xmin"
   main = [
       {Name = "Github", URL = "https://github.com/0xca7/"},
       {Name = "YouTube", URL = "https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ"},
-      {Name = "Blog", URL = "/posts"}
+      {Name = "Blog", URL = "/posts"},
   ]
