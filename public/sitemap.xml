@@ -3,13 +3,19 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://0xca7.github.io/</loc>
-    <lastmod>2022-08-28T19:32:42+02:00</lastmod>
+    <lastmod>2022-08-31T19:09:03+02:00</lastmod>
     <priority>0</priority>
   </url><url>
-    <loc>https://0xca7.github.io/posts/ghidrathon_unicorn/</loc>
-    <lastmod>2022-08-28T19:32:42+02:00</lastmod>
+    <loc>https://0xca7.github.io/posts/mount_jffs2/</loc>
+    <lastmod>2022-08-31T19:09:03+02:00</lastmod>
   </url><url>
     <loc>https://0xca7.github.io/posts/</loc>
+    <lastmod>2022-08-31T19:09:03+02:00</lastmod>
+  </url><url>
+    <loc>https://0xca7.github.io/posts/docker/</loc>
+    <lastmod>2022-08-31T16:32:04+02:00</lastmod>
+  </url><url>
+    <loc>https://0xca7.github.io/posts/ghidrathon_unicorn/</loc>
     <lastmod>2022-08-28T19:32:42+02:00</lastmod>
   </url><url>
     <loc>https://0xca7.github.io/posts/calling_conventions/</loc>

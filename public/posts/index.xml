@@ -6,7 +6,34 @@
     <description>Recent content in Posts on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 28 Aug 2022 19:32:42 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 31 Aug 2022 19:09:03 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Mount JFFS2 Filesystems</title>
+      <link>https://0xca7.github.io/posts/mount_jffs2/</link>
+      <pubDate>Wed, 31 Aug 2022 19:09:03 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/posts/mount_jffs2/</guid>
+      <description>When reversing firmware, you often just get a blob of data from the vendor website. Usually, you look at it in a hex editor and/or run binwalk on it to identify what the blob contains. I often run into the JFFS2 filesystem (https://en.wikipedia.org/wiki/JFFS2).
+Running binwalk -e on the firmware to extract the components will leave you with a JFFS2 file which is not further extracted. The script below can be used on this file to mount it so you can get at the data contained in the filesystem.</description>
+    </item>
+    
+    <item>
+      <title>Docker Notes</title>
+      <link>https://0xca7.github.io/posts/docker/</link>
+      <pubDate>Wed, 31 Aug 2022 16:32:04 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/posts/docker/</guid>
+      <description>Docker notes about how to do things with docker for reference.
+Installation Best to get the version directly from docker.com, see:
+https://docs.docker.com/engine/install/debian/
+or
+https://docs.docker.com/engine/install/ubuntu/
+Images You can get official images via docker directly. See https://hub.docker.com/ - this shows the commands to pull images.
+Example:
+docker pull debian Containers Creating a container from the image can be done as follows:
+Create a container debian_test based on the debian image with full host network access, launch it and attach to it.</description>
+    </item>
+    
     <item>
       <title>Ghidrathon &#43; Unicorn Engine &#43; Capstone</title>
       <link>https://0xca7.github.io/posts/ghidrathon_unicorn/</link>
