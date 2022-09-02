@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>0xca7</title>
-    <link>https://0xca7.github.io/</link>
-    <description>Recent content on 0xca7</description>
+    <title>Notes on 0xca7</title>
+    <link>https://0xca7.github.io/notes/</link>
+    <description>Recent content in Notes on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 01 Sep 2022 18:45:47 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 01 Sep 2022 18:45:47 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/notes/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Debian ARM/aarch64 in virt-manager</title>
       <link>https://0xca7.github.io/notes/virt-manager-arm/</link>
@@ -49,16 +49,6 @@ Create a container debian_test based on the debian image with full host network 
     </item>
     
     <item>
-      <title>Ghidrathon &#43; Unicorn Engine &#43; Capstone</title>
-      <link>https://0xca7.github.io/posts/ghidrathon_unicorn/</link>
-      <pubDate>Sun, 28 Aug 2022 19:32:42 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/ghidrathon_unicorn/</guid>
-      <description>Ghidra with Ghidrathon + Unicorn Engine The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&amp;rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.
-My Script I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3].</description>
-    </item>
-    
-    <item>
       <title>Calling Conventions</title>
       <link>https://0xca7.github.io/notes/calling_conventions/</link>
       <pubDate>Fri, 26 Aug 2022 20:56:15 +0200</pubDate>
@@ -66,29 +56,6 @@ My Script I created a simple Ghidra Python3 script that uses unicorn together wi
       <guid>https://0xca7.github.io/notes/calling_conventions/</guid>
       <description>This is a small overview of calling conventions regarding the x86 and x86_64 architectures, both for Windows and Linux
 Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function. Return values are stored in the EAX register.</description>
-    </item>
-    
-    <item>
-      <title>Collection of Malware Analysis Writeups</title>
-      <link>https://0xca7.github.io/posts/malware_analysis/</link>
-      <pubDate>Fri, 26 Aug 2022 15:46:59 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/malware_analysis/</guid>
-      <description>All of the files below are PDFs, they have been saved as such from my old site.
-Analysis of a .NET infostealer Blackguard Stealer
-Analysis of the famous Redline stealer Redline Stealer
-Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer
-Analysis of a botnet malware targeting Linux systems Linux Botnet
-Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
-    </item>
-    
-    <item>
-      <title>ARM Cortex-M3 libopencm3 Project</title>
-      <link>https://0xca7.github.io/posts/libopencm3_project/</link>
-      <pubDate>Fri, 29 Jul 2022 20:36:47 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/libopencm3_project/</guid>
-      <description>Introduction A while ago I ordered a STM32 Blue Pill board. This normally features a STM32F103C8T6 microcontroller, however, mine has a STM32F103C6T6 on it. I decided to program it using libopencm3 (http://libopencm3.org/). As the STMF103C6T6 does not feature a floating point unit (FPU), I thought I&amp;rsquo;d play with fixed point numbers a little. In this post, I will document the simple fixed-point arithmetic I implemented and show how to use</description>
     </item>
     
   </channel>

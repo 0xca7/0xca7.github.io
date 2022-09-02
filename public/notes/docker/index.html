@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Docker Notes | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Docker Notes</span></h1>
+
+<h2 class="date">2022/08/31</h2>
+</div>
+
+<main>
+<h1 id="docker">Docker</h1>
+<p>notes about how to do things with docker for reference.</p>
+<h1 id="installation">Installation</h1>
+<p>Best to get the version directly from docker.com, see:</p>
+<p><code>https://docs.docker.com/engine/install/debian/</code></p>
+<p>or</p>
+<p><code>https://docs.docker.com/engine/install/ubuntu/</code></p>
+<h1 id="images">Images</h1>
+<p>You can get official images via docker directly. See <code>https://hub.docker.com/</code> - this shows the commands to pull images.</p>
+<p>Example:</p>
+<pre tabindex="0"><code>docker pull debian
+</code></pre><h1 id="containers">Containers</h1>
+<p>Creating a container from the image can be done as follows:</p>
+<p>Create a container <code>debian_test</code> based on the <code>debian</code> image with full host network access, launch it and attach to it.</p>
+<pre tabindex="0"><code>docker run -it --net=host --name=debian_test debian
+</code></pre><p>If the container is off, you can do the following:</p>
+<pre tabindex="0"><code># start the container
+docker start debian_test
+# attach to it
+docker container attach debian_test
+# when you&#39;re done
+docker stop debian_test
+</code></pre><p>Show all containers, running and not running:</p>
+<pre tabindex="0"><code>docker ps -a 
+</code></pre><p>Create a container based on debian image, attach a shared storage and host network to container. Syntax is `-v HOST_SOURCE_DIR:GUEST_DESTINATION_DIR</p>
+<pre tabindex="0"><code>docker run -it --net=host --name=debian_test -v ~/docker/container_data:/data debian
+</code></pre><h1 id="network-interfaces">Network Interfaces</h1>
+<p>Create a container <code>deb0</code> with shared storage and attach it to a bridge network. Create another container <code>deb1</code>.</p>
+<pre tabindex="0"><code>docker run -it -h deb0 --net=bridge --name=deb0 -v ~/docker/container_data:/data debian
+docker run -it -h deb1 --net=bridge --name=deb1 -v ~/docker/container_data:/data debian
+</code></pre><p>Get the IP address of a container</p>
+<pre tabindex="0"><code>docker inspect &lt;container_id&gt; | grep IPAddress
+</code></pre><p>Multiple Network Interfaces:</p>
+<p>see: <a href="https://stackoverflow.com/questions/34110416/start-container-with-multiple-network-interfaces">https://stackoverflow.com/questions/34110416/start-container-with-multiple-network-interfaces</a></p>
+<pre tabindex="0"><code>docker create --network=network1 --name container_name containerimage:latest
+docker network connect network2 container_name
+docker start container_name
+docker network create --driver=bridge network1 --subnet=172.19.0.0/24
+docker network create --driver=bridge network2 --subnet=172.19.1.0/24
+</code></pre><h1 id="image-from-container">Image from Container</h1>
+<p>Show images</p>
+<pre tabindex="0"><code>docker images -a 
+</code></pre><p>Save container with a tag</p>
+<pre tabindex="0"><code>docker commit [container name] [image name]
+</code></pre><p>Save a container WITHOUT A TAG</p>
+<pre tabindex="0"><code>docker commit [container name]
+</code></pre><p>Container is saved with tag <code>none</code></p>
+<p>now you can tag it.</p>
+<pre tabindex="0"><code>docker tag [container ID] name
+</code></pre><h1 id="save-an-image--container">Save an Image / Container</h1>
+<pre tabindex="0"><code>docker save [image ]&gt; [image].tar
+docker save [image]:latest | gzip &gt; [name].tar.gz
+</code></pre><hr>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calling Conventions | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Calling Conventions</span></h1>
+
+<h2 class="date">2022/08/26</h2>
+</div>
+
+<main>
+<p>This is a small overview of calling conventions regarding the x86 and x86_64
+architectures, both for Windows and Linux</p>
+<hr>
+<h2 id="windows">Windows</h2>
+<p>The <code>stdcall</code> calling convention &hellip; the callee is responsible for cleaning up the stack, but the <em>parameters are pushed onto the stack in right-to-left order</em>, as in the <code>_cdecl</code> calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function. Return values are stored in the EAX register.</p>
+<p>stdcall is the standard calling convention for the Microsoft Win32 API.</p>
+<h3 id="x86">x86</h3>
+<p>On x86 platforms, all arguments are widened to 32 bits when they are passed. Return values are also widened to 32 bits and returned in the EAX register, except for 8-byte structures, which are returned in the EDX:EAX register pair. Larger structures are returned in the EAX register as pointers to hidden return structures. Parameters are pushed onto the stack from right to left.</p>
+<h3 id="x86_64">x86_64</h3>
+<p>Integer arguments are passed in registers <code>RCX, RDX, R8, and R9</code>. Floating point arguments are passed in <code>XMM0L, XMM1L, XMM2L, and XMM3L</code></p>
+<p>The first four arguments are placed onto the registers. That means RCX, RDX, R8, R9 for integer, struct or pointer arguments (in that order), and XMM0, XMM1, XMM2, XMM3 for floating point arguments. Additional arguments are pushed onto the stack (right to left).</p>
+<h2 id="linux">Linux</h2>
+<h3 id="systemcalls">Systemcalls</h3>
+<p><a href="https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md">https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md</a></p>
+<p>Note: this is only relevant for system calls, not for function calls.
+<img src=":/74b3ee207583442597df011ef8699eb5" alt="63f534ca3a5d4b59092d79d7d6f57fe2.png"></p>
+<h3 id="x86-1">x86</h3>
+<p>In x86-32 parameters were passed on stack. Last parameter was pushed first on to the stack until all parameters are done and then call instruction was executed. This is used for calling C library (libc) functions on Linux from assembly.</p>
+<h3 id="x86_64-1">x86_64</h3>
+<p>The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, R9 (R10 is used as a static chain pointer in case of nested functions[25]: 21 ), while XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6 and XMM7 are used for the first floating point arguments.[25]: 22  As in the Microsoft x64 calling convention, additional arguments are passed on the stack.</p>
+<p>see this for great detailed explanation:
+<a href="https://stackoverflow.com/questions/2535989/what-are-the-calling-conventions-for-unix-linux-system-calls-and-user-space-f">https://stackoverflow.com/questions/2535989/what-are-the-calling-conventions-for-unix-linux-system-calls-and-user-space-f</a></p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

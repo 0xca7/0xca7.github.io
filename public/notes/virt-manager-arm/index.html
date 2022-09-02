@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Debian ARM/aarch64 in virt-manager | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Debian ARM/aarch64 in virt-manager</span></h1>
+
+<h2 class="date">2022/09/01</h2>
+</div>
+
+<main>
+<p>This note describes how to use <code>virt-manager</code> on a x86-64 system and install an ARM or aarch64 operating system, namely <code>Debian Linux</code>.</p>
+<h2 id="requirements">Requirements</h2>
+<p>First install all requirements:</p>
+<pre tabindex="0"><code>sudo apt install -y virt-manager qemu-kvm python-is-python3 guestfish
+</code></pre><p>Enable and run <code>libvirtd</code></p>
+<pre tabindex="0"><code>sudo systemctl enable libvirtd
+sudo systemctl start libvirtd
+</code></pre><p>Add your user to the appropriate group</p>
+<pre tabindex="0"><code>sudo usermod -a -G libvirt $USER
+</code></pre><p>Best to reboot after this.</p>
+<h2 id="debian-installation">Debian Installation</h2>
+<p>We need the Debian <strong>DVD</strong> as it comes with all the components we are interested in. So get that from:</p>
+<p><a href="https://cdimage.debian.org/debian-cd/current/armhf/iso-dvd/">https://cdimage.debian.org/debian-cd/current/armhf/iso-dvd/</a>
+or
+<a href="https://cdimage.debian.org/debian-cd/current/arm64/iso-dvd/">https://cdimage.debian.org/debian-cd/current/arm64/iso-dvd/</a></p>
+<p>depending on what you want.</p>
+<p>Once that is downloaded, we need the kernel <code>vmlinuz</code> and <code>initrd.gz</code> from the DVD, for that, mount the DVD.</p>
+<pre tabindex="0"><code>sudo mkdir -p /mnt/disk
+mount [DEBIAN IMAGE] /mnt/disk
+
+cp /mnt/disk/install.a64/vmlinuz [wherever you want]
+cp /mnt/disk/install.a64/initrd.gz [wherever you want]
+</code></pre><p>Now, we&rsquo;re ready to setup the machine.</p>
+<ol>
+<li>create a new VM and select the appropriate arch:</li>
+</ol>
+<p><img src="/static/01.png" alt="01"></p>
+<ol start="2">
+<li>
+<p>select the Debian DVD you downloaded on the next screen</p>
+</li>
+<li>
+<p>setup the amount of CPUs and the RAM</p>
+</li>
+<li>
+<p>setup the storage space you want</p>
+</li>
+<li>
+<p>select <code>Customize configuration before install</code></p>
+</li>
+</ol>
+<p><img src="/static/02.png" alt="02"></p>
+<ol start="6">
+<li>apply the options below</li>
+</ol>
+<p>UEFI:</p>
+<p><img src="/static/03.png" alt="03"></p>
+<p>Direct kernel boot and Boot device order:</p>
+<p><img src="/static/04.png" alt="04"></p>
+<p>Remove the TPM by rightclicking and selecting <code>Remove Hardware</code>.</p>
+<p>After you&rsquo;ve got this, just begin the installation. You will get a screen with the Debian installer. Run the installer through but DO NOT REBOOT. Wait for this screen:</p>
+<p><img src="/static/05.png" alt="05"></p>
+<p>Choose <code>Go Back</code> here and scroll down in the menu, we want to <code>Execute a shell</code>, which will leave us with a command prompt after selecting this option.</p>
+<p>First, do <code>ip -a</code> here to determine the IP of the VM, for me, it&rsquo;s <code>192.168.122.35</code>. Once you have that, do:</p>
+<pre tabindex="0"><code>cd target/boot
+ls -l
+</code></pre><p>The two files we want are whatever the symlinks <code>initrd./static</code> and <code>vmlinuz</code> point to.</p>
+<p><img src="/static/06.png" alt="06"></p>
+<p>For this, we can use <code>virt-copy-out</code> like this:</p>
+<pre tabindex="0"><code>sudo virt-copy-out -a [image] /boot/vmlinuz-5.10.0-17-arm64 .
+sudo virt-copy-out -a [image] /boot/initrd./static-5.10.0-17-arm64 .
+</code></pre><p>All we need for this is the location of the qcow2 image that was created by virt-manager. You can look this up in the VM information under the VirtIO Disk 1 - for me, it&rsquo;s <code>/var/lib/libvirt/images/debian11-aarch64.qcow2</code></p>
+<p>Once these files are copied out, we can finish the installation in Debian by running <code>exit</code> from the shell.</p>
+<p>Go to the <code>Finish the installation</code> step and reboot the machine. Here, you can just shut the guest off when the reboot is issued.</p>
+<p>Now go back to the <code>Boot Options</code> in the VM settings and choose the two files we just copied from the VM, the Kernel <code>vmlinuz</code> and <code>initrd</code>. Also remove the CD so only the hard-disk is checked. In addition, the kernel args should be <code>root=/dev/vda2</code> like this:</p>
+<p><img src="/static/07.png" alt="07"></p>
+<p>Now you can start the VM and enjoy your new Debian System.</p>
+<p>PS: if you need a graphical user interface (you installed GNOME, XFCE, etc) just
+add a screen in the VM settings :)</p>
+<hr>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+
