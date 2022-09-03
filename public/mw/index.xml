@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Mws on 0xca7</title>
+    <link>https://0xca7.github.io/mw/</link>
+    <description>Recent content in Mws on 0xca7</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 03 Sep 2022 09:52:46 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/mw/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Stop/DJVU Analysis</title>
+      <link>https://0xca7.github.io/mw/stop_djvu/</link>
+      <pubDate>Sat, 03 Sep 2022 09:52:46 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/stop_djvu/</guid>
+      <description>Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
+    </item>
+    
+    <item>
+      <title>Linux Botnet Analysis</title>
+      <link>https://0xca7.github.io/mw/linux_botnet/</link>
+      <pubDate>Sat, 03 Sep 2022 09:52:40 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/linux_botnet/</guid>
+      <description>Analysis of a botnet malware targeting Linux systems Linux Botnet</description>
+    </item>
+    
+    <item>
+      <title>Golang Stealer</title>
+      <link>https://0xca7.github.io/mw/golang_stealer/</link>
+      <pubDate>Sat, 03 Sep 2022 09:52:34 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/golang_stealer/</guid>
+      <description>Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer</description>
+    </item>
+    
+    <item>
+      <title>Redline Stealer Analysis</title>
+      <link>https://0xca7.github.io/mw/redline/</link>
+      <pubDate>Sat, 03 Sep 2022 09:52:29 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/redline/</guid>
+      <description>Analysis of the famous Redline stealer Redline Stealer</description>
+    </item>
+    
+    <item>
+      <title>Blackguard</title>
+      <link>https://0xca7.github.io/mw/blackguard/</link>
+      <pubDate>Sat, 03 Sep 2022 09:52:24 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/blackguard/</guid>
+      <description>get the Blackguard stealer analysis from my old site here as a pdf:
+Analysis of a .NET infostealer Blackguard Stealer</description>
+    </item>
+    
+    <item>
+      <title>Collection of Malware Analysis Writeups</title>
+      <link>https://0xca7.github.io/mw/malware_analysis/</link>
+      <pubDate>Fri, 26 Aug 2022 15:46:59 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/malware_analysis/</guid>
+      <description>All of the files below are PDFs, they have been saved as such from my old site.
+Analysis of a .NET infostealer Blackguard Stealer
+Analysis of the famous Redline stealer Redline Stealer
+Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer
+Analysis of a botnet malware targeting Linux systems Linux Botnet
+Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
+    </item>
+    
+  </channel>
+</rss>
