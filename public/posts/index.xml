@@ -6,7 +6,19 @@
     <description>Recent content in Posts on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 28 Aug 2022 19:32:42 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 12 Sep 2022 10:12:29 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>The Art of Malware Analysis - Course Review</title>
+      <link>https://0xca7.github.io/posts/aoma/</link>
+      <pubDate>Mon, 12 Sep 2022 10:12:29 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/posts/aoma/</guid>
+      <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).
+Time to do my part and review the course. I like small reviews, so I will keep it at that.
+Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.
+Key Points very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction Details The course starts with a general introduction to malware and the analysis of malware.</description>
+    </item>
+    
     <item>
       <title>Ghidrathon &#43; Unicorn Engine &#43; Capstone</title>
       <link>https://0xca7.github.io/posts/ghidrathon_unicorn/</link>
