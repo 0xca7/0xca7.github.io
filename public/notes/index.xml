@@ -6,7 +6,17 @@
     <description>Recent content in Notes on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 01 Sep 2022 18:45:47 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/notes/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 14 Sep 2022 19:42:07 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/notes/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Lattice Cryptography Notes</title>
+      <link>https://0xca7.github.io/notes/pq_lattice/</link>
+      <pubDate>Wed, 14 Sep 2022 19:42:07 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/notes/pq_lattice/</guid>
+      <description>These are my notes for lattice crypto, please mind the mentioned authors that enabled me to take these notes. All credit goes to those people, not me.
+see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;</description>
+    </item>
+    
     <item>
       <title>Debian ARM/aarch64 in virt-manager</title>
       <link>https://0xca7.github.io/notes/virt-manager-arm/</link>
