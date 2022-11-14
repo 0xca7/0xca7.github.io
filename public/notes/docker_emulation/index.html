@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Firmware Emulation with Docker | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Firmware Emulation with Docker</span></h1>
+
+<h2 class="date">2022/11/14</h2>
+</div>
+
+<main>
+<h1 id="resources">Resources</h1>
+<p>My main resources for this post is the talk here:</p>
+<p><a href="https://www.youtube.com/watch?v=ALn0hUxNszI&amp;t=1288s">https://www.youtube.com/watch?v=ALn0hUxNszI&amp;t=1288s</a></p>
+<p>Credit to the Author.</p>
+<p>I just took what he&rsquo;s doing and made it work on my machine, instead of MIPS I&rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.</p>
+<hr>
+<h2 id="create-a-dockerfile">Create a Dockerfile</h2>
+<p>MIPS from the talk in [Resources]:</p>
+<pre tabindex="0"><code>FROM multiarch/debian-debootstrap:mips-buster-slim as qemu
+FROM scratch
+ADD ./firmware.tar.gz /
+COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin
+CMD [&#34;/usr/bin/qemu-mips-static&#34;, &#34;bin/busybox&#34;]
+ENV ARCH=mips
+</code></pre><p>ARM from my setup:</p>
+<pre tabindex="0"><code>FROM multiarch/debian-debootstrap:armel-buster-slim as qemu
+FROM scratch
+ADD ./firmware.tar.gz /
+COPY --from=qemu /usr/bin/qemu-arm-static /usr/bin
+CMD [&#34;/usr/bin/qemu-arm-static&#34;, &#34;bin/busybox&#34;]
+ENV ARCH=arm
+</code></pre><h2 id="build-the-container">Build the Container</h2>
+<p>Use the command:</p>
+<pre tabindex="0"><code>docker build --rm -t [NAME] -f dockerfile .
+
+# example
+docker build --rm -t ARMcontainer -f dockerfile .
+</code></pre><h2 id="run-the-container">Run the Container</h2>
+<p>Running the container is straight forward, however, I needed to load shared libaries as shown below.</p>
+<pre tabindex="0"><code>docker run -it --rm [NAME]:latest [EXECUTABLE]
+
+# example
+docker run -it --rm router:latest sh
+
+# in my case for the target firmware
+docker run -it --rm armdocker:latest lib/ld-linux.so.3 --library-path lib/ userdisk/ControlCenter
+</code></pre><h2 id="manually-loading-shared-libraries">Manually Loading Shared Libraries</h2>
+<pre tabindex="0"><code>docker run -it --rm armdocker:latest lib/ld-linux.so.2 --library-path lib/ bin/busybox
+docker run -it --rm armdocker:latest lib/ld-linux.so.2 --library-path lib/ etc/init.d/rcS
+</code></pre><h2 id="emulation-of-a-firmware-image">Emulation of a Firmware Image</h2>
+<ol>
+<li>get the firmware</li>
+<li>extract the filesystem</li>
+<li>go to the file system root directory and do <code>tar cvf firmware.tar.gz .</code></li>
+<li>now copy <code>firmware.tar.gz</code> to the directory with the dockerfile</li>
+<li>build the container</li>
+<li>run the container with the above commands</li>
+</ol>
+<p>you should now be running an emulation of the firmware inside a docker container.</p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

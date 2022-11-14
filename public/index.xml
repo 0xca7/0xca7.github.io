@@ -6,7 +6,21 @@
     <description>Recent content on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Wed, 14 Sep 2022 19:42:07 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Mon, 14 Nov 2022 19:24:18 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Firmware Emulation with Docker</title>
+      <link>https://0xca7.github.io/notes/docker_emulation/</link>
+      <pubDate>Mon, 14 Nov 2022 19:24:18 +0100</pubDate>
+      
+      <guid>https://0xca7.github.io/notes/docker_emulation/</guid>
+      <description>Resources My main resources for this post is the talk here:
+https://www.youtube.com/watch?v=ALn0hUxNszI&amp;amp;t=1288s
+Credit to the Author.
+I just took what he&amp;rsquo;s doing and made it work on my machine, instead of MIPS I&amp;rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.
+Create a Dockerfile MIPS from the talk in [Resources]:
+FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;#34;/usr/bin/qemu-mips-static&amp;#34;, &amp;#34;bin/busybox&amp;#34;] ENV ARCH=mips ARM from my setup:</description>
+    </item>
+    
     <item>
       <title>Lattice Cryptography Notes</title>
       <link>https://0xca7.github.io/notes/pq_lattice/</link>
