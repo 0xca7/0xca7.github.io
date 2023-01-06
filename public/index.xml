@@ -6,7 +6,20 @@
     <description>Recent content on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 14 Nov 2022 19:24:18 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Fri, 06 Jan 2023 18:17:14 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Reversing AARCH64 C&#43;&#43; Binaries</title>
+      <link>https://0xca7.github.io/posts/aarch64_cpp/</link>
+      <pubDate>Fri, 06 Jan 2023 18:17:14 +0100</pubDate>
+      
+      <guid>https://0xca7.github.io/posts/aarch64_cpp/</guid>
+      <description>In the files below you can find my notes regarding reversing C++ binaries compiled for AARCH64 / ARM64. The compiler used for all of these is g++, the stripping of one of the binaries was achieved via the strip command. No options were given to g++ when compiling on an aarch64 Debian 11 system. Enjoy.
+00 - Basic Classes
+01 - Pure Virtual Methods I
+02 - Abstract Class
+03 - Template</description>
+    </item>
+    
     <item>
       <title>Firmware Emulation with Docker</title>
       <link>https://0xca7.github.io/notes/docker_emulation/</link>

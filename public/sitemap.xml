@@ -3,8 +3,14 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://0xca7.github.io/</loc>
-    <lastmod>2022-11-14T19:24:18+01:00</lastmod>
+    <lastmod>2023-01-06T18:17:14+01:00</lastmod>
     <priority>0</priority>
+  </url><url>
+    <loc>https://0xca7.github.io/posts/</loc>
+    <lastmod>2023-01-06T18:17:14+01:00</lastmod>
+  </url><url>
+    <loc>https://0xca7.github.io/posts/aarch64_cpp/</loc>
+    <lastmod>2023-01-06T18:17:14+01:00</lastmod>
   </url><url>
     <loc>https://0xca7.github.io/notes/docker_emulation/</loc>
     <lastmod>2022-11-14T19:24:18+01:00</lastmod>
@@ -14,9 +20,6 @@
   </url><url>
     <loc>https://0xca7.github.io/notes/pq_lattice/</loc>
     <lastmod>2022-09-14T19:42:07+02:00</lastmod>
-  </url><url>
-    <loc>https://0xca7.github.io/posts/</loc>
-    <lastmod>2022-09-12T10:12:29+02:00</lastmod>
   </url><url>
     <loc>https://0xca7.github.io/posts/aoma/</loc>
     <lastmod>2022-09-12T10:12:29+02:00</lastmod>
