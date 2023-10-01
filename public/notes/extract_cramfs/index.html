@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Extract cramfs | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Extract cramfs</span></h1>
+
+<h2 class="date">2023/02/25</h2>
+</div>
+
+<main>
+<p>check if LE or BE</p>
+<pre tabindex="0"><code>file cramfs
+</code></pre><p>if the file is big endian, make it little endian with this</p>
+<pre tabindex="0"><code>cramfsswap cramfs cramfs_le
+</code></pre><p>extract</p>
+<pre tabindex="0"><code># if not converted via the command above, cramfs is little endian
+sudo fsck.cramfs --extract=fs cramfs
+# if converted via the command above, the file is renamed to &#34;cramfs_le&#34;
+sudo fsck.cramfs --extract=fs cramfs_le
+</code></pre>
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mounting UBIFS | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Mounting UBIFS</span></h1>
+
+<h2 class="date">2023/02/25</h2>
+</div>
+
+<main>
+<p>Detailed Information: <a href="http://trac.gateworks.com/wiki/linux/ubi">http://trac.gateworks.com/wiki/linux/ubi</a></p>
+<p>simulate a NAND device</p>
+<pre tabindex="0"><code>modprobe nandsim first_id_byte=0x2c second_id_byte=0xac third_id_byte=0x90 fourth_id_byte=0x15
+</code></pre><p>check if the device is set up</p>
+<pre tabindex="0"><code>cat /proc/mtd
+</code></pre><p>clean the device</p>
+<pre tabindex="0"><code>flash_erase /dev/mtd0 0 0
+</code></pre><p>format and flash</p>
+<pre tabindex="0"><code>ubiformat /dev/mtd0 -f image.ubi -O 2048
+</code></pre><p>attach device</p>
+<pre tabindex="0"><code>modprobe ubi 
+ubiattach -p /dev/mtd0 -O 2048
+</code></pre><p>and now mount the device - mind you have to replace the <code>X</code> with <code>0,1,2...</code></p>
+<pre tabindex="0"><code>mount -t ubifs /dev/ubi0_X /mnt/ubifs
+</code></pre>
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

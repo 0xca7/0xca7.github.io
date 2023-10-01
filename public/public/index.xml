@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Publics on 0xca7</title>
+    <link>https://0xca7.github.io/public/</link>
+    <description>Recent content in Publics on 0xca7</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 01 Oct 2023 10:26:15 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/public/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Reverse Engineering Router Firmware - But the Firmware is Encrypted</title>
+      <link>https://0xca7.github.io/public/posts/decrypting_firmware/</link>
+      <pubDate>Sun, 01 Oct 2023 10:26:15 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/public/posts/decrypting_firmware/</guid>
+      <description>Author: 0xca7
+Introduction For the last couple of years, I&amp;rsquo;ve been doing some security research on network equipment (routers, switches, etc.) for consumer, enterprise and industrial applications. I did this mostly out of curiosity and to get better at reverse engineering. I noticed that a lot of tutorials cover downloading firmware, unpacking it with binwalk and that&amp;rsquo;s it. There&amp;rsquo;s rarely any reverse engineering going on. That&amp;rsquo;s fine, you gotta started somewhere and it&amp;rsquo;s resources like this that get people started.</description>
+    </item>
+    
+  </channel>
+</rss>

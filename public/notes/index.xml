@@ -6,7 +6,35 @@
     <description>Recent content in Notes on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 14 Nov 2022 19:24:18 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/notes/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 25 Feb 2023 20:56:49 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/notes/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Extract cramfs</title>
+      <link>https://0xca7.github.io/notes/extract_cramfs/</link>
+      <pubDate>Sat, 25 Feb 2023 20:56:49 +0100</pubDate>
+      
+      <guid>https://0xca7.github.io/notes/extract_cramfs/</guid>
+      <description>check if LE or BE
+file cramfs if the file is big endian, make it little endian with this
+cramfsswap cramfs cramfs_le extract
+# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;#34;cramfs_le&amp;#34; sudo fsck.cramfs --extract=fs cramfs_le </description>
+    </item>
+    
+    <item>
+      <title>Mounting UBIFS</title>
+      <link>https://0xca7.github.io/notes/mount_ubifs/</link>
+      <pubDate>Sat, 25 Feb 2023 20:51:56 +0100</pubDate>
+      
+      <guid>https://0xca7.github.io/notes/mount_ubifs/</guid>
+      <description>Detailed Information: http://trac.gateworks.com/wiki/linux/ubi
+simulate a NAND device
+modprobe nandsim first_id_byte=0x2c second_id_byte=0xac third_id_byte=0x90 fourth_id_byte=0x15 check if the device is set up
+cat /proc/mtd clean the device
+flash_erase /dev/mtd0 0 0 format and flash
+ubiformat /dev/mtd0 -f image.ubi -O 2048 attach device
+modprobe ubi ubiattach -p /dev/mtd0 -O 2048 and now mount the device - mind you have to replace the X with 0,1,2...
+mount -t ubifs /dev/ubi0_X /mnt/ubifs </description>
+    </item>
+    
     <item>
       <title>Firmware Emulation with Docker</title>
       <link>https://0xca7.github.io/notes/docker_emulation/</link>

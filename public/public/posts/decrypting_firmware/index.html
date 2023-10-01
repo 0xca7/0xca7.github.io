@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reverse Engineering Router Firmware - But the Firmware is Encrypted | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Reverse Engineering Router Firmware - But the Firmware is Encrypted</span></h1>
+
+<h2 class="date">2023/10/01</h2>
+</div>
+
+<main>
+<h1 id="heading"></h1>
+<p>Author: <em>0xca7</em></p>
+<h2 id="introduction">Introduction</h2>
+<p>For the last couple of years, I&rsquo;ve been doing some security research on network equipment (routers, switches, etc.) for consumer, enterprise and industrial applications. I did this mostly out of curiosity and to get better at reverse engineering. I noticed that a lot of tutorials cover downloading firmware, unpacking it with binwalk and that&rsquo;s it. There&rsquo;s rarely any reverse engineering going on. That&rsquo;s fine, you gotta started somewhere and it&rsquo;s resources like this that get people started. But what about more &ldquo;advanced&rdquo; cases? What if the firmware is encrypted? (No, XOR ist not encryption). This is what I will cover in this blog post. My hope is I can fill a gap and inspire others to get (further) into reversing. Enough talk, let&rsquo;s go.</p>
+<h2 id="disclaimer">Disclaimer</h2>
+<p>I left out all references to the manufacturer and the device model, I have no interest in being sued for whatever reason. Doesn&rsquo;t matter what device it is, this blog post is about the journey and the reversing process.</p>
+<h2 id="getting-started">Getting Started</h2>
+<p>Usually, I get started by looking for lists of manufacturers of network devices. From there, I pick something that stands out for me or choose totally at random. Then, I go the manufacturers website and download firmware. It was a day like any other when I downloaded the firmware image in question, among others. I quickly realized that only one image was encrypted, images for the others devices were not. I though this was strange and began to research a little. The device in question was relatively new on the market, so I guess the manufacturer changed some things up. Well, at this point I had two options. Option one was to drop it and choose one of the unencrypted images. Option two was to try to tackle the encrypted one. I went with the latter, seemed more fun. My reasoning was as follows:</p>
+<ul>
+<li>the router must contain some code that will decrypt the firmware that is thrown at it.</li>
+<li>on the router, the code is stored in a flash chip</li>
+<li>decrypting the encrypted firmware based on these assuptions is more interesting than working with non-encrypted firmware</li>
+</ul>
+<p>Next, I looked up prices for the device, 35 euros in my case. As I had some spare money for toys, I ordered it. But before that, I did some recon.</p>
+<p>Spoiler Alert: No, it&rsquo;s not a hard-coded XOR key that &ldquo;encrypts&rdquo; the firmware.</p>
+<p>Looking at the entropy calculation of the encrypted firmware image, downloaded from the vendor&rsquo;s website, you can see a high entropy which is not achievable with something &ldquo;simple&rdquo;.</p>
+<p><img src="/static/entropy.png" alt=""></p>
+<p>Note that this could also be compression (gzip, etc.), which also leads to a high entropy, but I didn&rsquo;t see any headers for that in a hexdump. Just what seemed like random noise, indicating proper encryption.</p>
+<h2 id="recon---fcc-id">Recon - FCC-ID</h2>
+<p>One thing you can do when you want a closer look <em>into</em> a device without actually buying and opening it is to check it out at <em>fccid.io</em>. For example, here you can find the entry for a netgear router <em><a href="https://fccid.io/PY322200568">https://fccid.io/PY322200568</a></em> - if you look into the exhibits there are some internal photos. That&rsquo;s exactly what I did and from the internal photos, I was able to see that there is a flash chip in SOIC-8 format on the PCB. Because I have a SOIC-8 clip and the appropriate programmer, I was confident I could dump the flash.</p>
+<h2 id="dumping-the-flash">Dumping the Flash</h2>
+<p>Soon, the device arrived and I was able to open the cover. A little surprise awaited me. The flash chip on the PCB was of the same format, but it was a different chip than the one on the FCC photos. That was a problem, the chip was an <em>EN25QX128A</em> - at the time, this wasn&rsquo;t supported by flashrom [0], the program I wanted to use to connect to my programmer and subsequently dump the flash. Well, it turns out I was in luck. There&rsquo;s an alternative: asprogrammer [1]. Only six days before the day I wanted to dump my flash, support for the EN25QX128A was added. Great, less work on my part. So, I started my Windows 10 VM, installed the software and dumped the flash. I took two dumps. The first one contained errors and was useless, the second one was good.</p>
+<p>Side Note: I actually had to take the flash chip off of the PCB in order to be able to dump it. The reason was that once the programmer was attached and plugged into my laptop the router booted, performing a lock on the flash. Thus, to get rid of that, I removed it from the PCB using two soldering irons (I don&rsquo;t have a hot air gun anymore or something similar, two soldering irons worked just fine - note to beginners: You don&rsquo;t need to invest thousands of bucks in equipment - don&rsquo;t believe the internet). This goes to show that dumping a flash might not be as simple as it looks in some tutorials.</p>
+<h2 id="poking-it-with-a-stick">Poking it with a Stick</h2>
+<p>To find out what I was up against, I ran <em>binwalk</em> [2] on the dump. This is what I got:</p>
+<pre tabindex="0"><code>DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+35096         0x8918          CRC32 polynomial table, little endian
+36192         0x8D60          gzip compressed data, maximum compression, from Unix, last modified: 1970-01-01 00:00:00 (null date)
+16711684      0xFF0004        OpenSSL encryption, salted, salt: ...
+</code></pre><p>The gzip&rsquo;d part was the most interesting to me, also the salt stood out. Out of sheer laziness, I extracted everything with binwalk to get me the file <code>8D60</code>, which is the compressed part between offsets <code>0x8D60</code> and <code>0xFF0004</code>. That&rsquo;s about 170kB in size, I extracted it. Having no idea what architecture the router is, I asked binwalk again with <code>binwalk -A</code>, applied to the extracted blob, which performs a best-guess regarding opcodes. This is what I got:</p>
+<pre tabindex="0"><code>--- SNIP ---
+97560         0x17D18         MIPSEL instructions, function epilogue
+97828         0x17E24         MIPSEL instructions, function epilogue
+98308         0x18004         MIPSEL instructions, function epilogue
+98492         0x180BC         MIPSEL instructions, function epilogue
+98824         0x18208         MIPSEL instructions, function epilogu
+--- SNIP ---
+</code></pre><p>Hate it or love it, seems to be MIPS little endian. Enter Ghidra.</p>
+<h2 id="reverse-engineering-with-ghidra">Reverse Engineering with Ghidra</h2>
+<h3 id="finding-the-base-address">Finding the Base Address</h3>
+<p>Alright, now for the fun part. I started by loading the binary file into Ghidra. As there are no ELF headers, it&rsquo;s loaded as <em>raw binary</em>. I went with the language options <code>MIPS:LE:32:default:default</code>.</p>
+<p>First order of business: find the base address of the image. Without the correct base address set, you won&rsquo;t get proper cross-references. After auto-analysis, I started at the beginning of the binary and scrolled down in the flat assembly view until I hit some code. Here, I began looking for constant values. This caught my eye:</p>
+<p><img src="/static/00_find_base.png" alt=""></p>
+<p>So, <code>0x80000000</code>. Looks good. I imported the binary again, this time, I set the base address accordingly and let the auto-analysis run.</p>
+<p><img src="/static/01_base_addr.png" alt=""></p>
+<p>In order to confirm that I was right with the base address, I started to look for strings and checked if there were some cross references to them - indeed, there were. In particular there was one very interesting string:</p>
+<p><img src="/static/02_decryption_string.png" alt="">
+<em>[Screenshot 0] Beginning of the Decryption Process</em></p>
+<p>Some decryption process. But what does this actually decrypt? Looking into the cross-references to the function containing the strings starting with <em>decryption</em> shows that the routine is called after the mention of a <em>TFTP Upload Client</em>. As TFTP is often used to update firmware, it looks like this is indeed the decryption process for the firmware - let&rsquo;s continue with that assumption.</p>
+<h3 id="decrypting-the-decryption-process">Decrypting the Decryption Process</h3>
+<p>So&hellip; the firmware gets to the device somehow, here, via TFTP. The firmware is encrypted, it&rsquo;s just a blob of data. It is decrypted, maybe it&rsquo;s authenticity is checked, then it is installed. That means somewhere in this process there are at least two components interesting to us:</p>
+<ol>
+<li>the encryption algorithm that is used</li>
+<li>the encryption key</li>
+</ol>
+<p>also, maybe:</p>
+<ol start="3">
+<li>an IV used in the encryption process</li>
+<li>public key material</li>
+</ol>
+<p>Looking at the last screenshot (<em>[Screenshot 0]</em>), you can see that <code>FUN_8000f574</code> is clearly some kind of printing routine, probably via the UART interface. The function labled <code>FUN_80019998</code> must be responsible for decryption, indicating success by returning a value $\geq 0$. Judging from the function parameters, the first will probably contain the encrypted data. The second could be the address to where the decrypted data is loaded to, the pointer to <code>local_8c</code> wasn&rsquo;t of interest to me at this point. Let&rsquo;s dig into <code>FUN_80019998</code> next.</p>
+<p>At the start of this function, there is another string to help us out:</p>
+<p><img src="/static/03_aes_key.png" alt=""></p>
+<p><em>[Screenshot 1] AES Key String</em></p>
+<p>In the screenshot above, label (1) shows the string <em>&ldquo;aes key =&rdquo;</em> as a parameter to some function (pointer) at <code>0x80036f40</code>, probably a debug print (2), activated by a global variable (<code>DAT_800297d0</code>) for debug builds. Following this is a loop, containing another print. The first parameter, <code>DAT_80026890</code> points to the string <em>&quot;%c&quot;</em> - indicating that the AES key should be an ASCII string - that&rsquo;s an important clue right there. The third label (3) shows us that the resulting AES key should be stored inside the buffer <code>local_674</code> - indexed by <code>uVar4</code> with a length of <code>local_74</code> bytes. Both of these parameters are passed into the function labled <code>FUN_80019780</code>, marked in green at the top of the screenshot. It looks like the next function we want to analyse is <code>FUN_80019780</code>, which, judging from the screenshot, should produce the AES key.</p>
+<p>Before we get into this function however, notice the arguments passed to it. First, <code>DAT_800297e0</code> contains a high entropy section of 512 bytes - the same number passed in as the second paramter (<code>0x200 == 512</code>), then we have what we assume is the resulting AES key and key length. The first and second parameters seem to be data andlength as well. Let&rsquo;s formulate some hypothesis of what could be happening here:</p>
+<ul>
+<li>we assume we get an AES key out, so it&rsquo;s probably derived or encrypted.</li>
+<li>something with a length of 512 (bytes) goes into the function.</li>
+<li>the 512 bytes are 4096 bits, which might be indicative of RSA-4096</li>
+</ul>
+<p>However, what stands against the RSA argument is that a private key would have to be used to decrypt. As a private key should never be shared with anyone, this doesn&rsquo;t seem logical. Only one way to find out&hellip; into <code>FUN_80019780</code> we go! Here it is, at least the first part, we will call this [F0]:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined4 <span style="color:#a6e22e">FUN_80019780</span>(undefined4 a_512buffer,undefined4 a_n512,<span style="color:#66d9ef">int</span> a_AES_KEY,<span style="color:#66d9ef">int</span> <span style="color:#f92672">*</span>a_KEYLEN)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>puVar1;
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>puVar2;
+</span></span><span style="display:flex;"><span>   undefined4 uVar3;
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>puVar4;
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">int</span> iVar5;
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">int</span> iVar6;
+</span></span><span style="display:flex;"><span>   undefined auStack_68 [<span style="color:#ae81ff">8</span>];
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>local_60;
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>local_5c;
+</span></span><span style="display:flex;"><span>   undefined4 local_40;
+</span></span><span style="display:flex;"><span>   undefined4 local_3c;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// SECTION 1 START 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   puVar1 <span style="color:#f92672">=</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#a6e22e">FUN_80016570</span>();  <span style="color:#75715e">// &lt;= [F1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   puVar2 <span style="color:#f92672">=</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#a6e22e">FUN_80016570</span>();
+</span></span><span style="display:flex;"><span>   uVar3 <span style="color:#f92672">=</span> <span style="color:#a6e22e">FUN_8000e4e4</span>(<span style="color:#ae81ff">0x204</span>);            <span style="color:#75715e">// &lt;= Allocation
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">=</span> uVar3;
+</span></span><span style="display:flex;"><span>   <span style="color:#a6e22e">FUN_8000e8b8</span>(uVar3,<span style="color:#f92672">&amp;</span>DAT_80023b20,<span style="color:#ae81ff">0x204</span>); <span style="color:#75715e">// &lt;= [F2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   puVar1[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x80</span>;
+</span></span><span style="display:flex;"><span>   puVar1[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x81</span>;
+</span></span><span style="display:flex;"><span>   puVar1[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>   puVar1[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>   puVar4 <span style="color:#f92672">=</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#a6e22e">FUN_8000e4e4</span>(<span style="color:#ae81ff">4</span>);
+</span></span><span style="display:flex;"><span>   <span style="color:#f92672">*</span>puVar2 <span style="color:#f92672">=</span> puVar4;
+</span></span><span style="display:flex;"><span>   <span style="color:#f92672">*</span>puVar4 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x10001</span>;                      <span style="color:#75715e">// &lt;= [F3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   puVar2[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>   puVar2[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>   puVar2[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>   puVar2[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// SECTION 1 END
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   <span style="color:#a6e22e">FUN_8000e894</span>(auStack_68,<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">0x40</span>);     
+</span></span><span style="display:flex;"><span>   local_40 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>   local_3c <span style="color:#f92672">=</span> <span style="color:#ae81ff">6</span>;
+</span></span><span style="display:flex;"><span>   local_60 <span style="color:#f92672">=</span> puVar1;
+</span></span><span style="display:flex;"><span>   local_5c <span style="color:#f92672">=</span> puVar2;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// SECTION 2 START
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   iVar5 <span style="color:#f92672">=</span> <span style="color:#a6e22e">FUN_80019eec</span>(a_n512,a_512buffer,a_AES_KEY,auStack_68,<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// SECTION 2 END
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>   uVar3 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xffffffff</span>;
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">if</span> (<span style="color:#ae81ff">0</span> <span style="color:#f92672">&lt;</span> iVar5) {
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">*</span>a_KEYLEN <span style="color:#f92672">=</span> iVar5;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (((((DAT_800297d0 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (_DAT_80036f40 <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>            ((<span style="color:#f92672">*</span>_DAT_80036f40)(s_RSA_plaintext_len_<span style="color:#f92672">=</span>_<span style="color:#f92672">%</span>ld_80026da0,iVar5), (DAT_800297d0 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>           (_DAT_80036f40 <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>         (<span style="color:#f92672">*</span>_DAT_80036f40)(s_RSA_plaintext:_80026dbc);
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span><span style="color:#f92672">--</span> SNIP <span style="color:#f92672">--</span>
+</span></span></code></pre></div><p>Alright, it seems there is something going on with RSA, as the string <code>RSA_plaintext</code> catches the eye. But what about the rest? I&rsquo;ve labled the functions and will go through them one-by-one.</p>
+<h3 id="f1">[F1]</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined4 <span style="color:#f92672">*</span> <span style="color:#a6e22e">FUN_80016570</span>(<span style="color:#66d9ef">void</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>   undefined4 <span style="color:#f92672">*</span>puVar1;
+</span></span><span style="display:flex;"><span>   
+</span></span><span style="display:flex;"><span>   puVar1 <span style="color:#f92672">=</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#a6e22e">FUN_8000e4e4</span>(<span style="color:#ae81ff">0x14</span>);
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">if</span> (puVar1 <span style="color:#f92672">==</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>) {
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">FUN_8000f780</span>(<span style="color:#e6db74">&#34;BN_F_BN_NEW,_ERR_R_MA_...&#34;</span>);
+</span></span><span style="display:flex;"><span>   }
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      puVar1[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>      puVar1[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      puVar1[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      puVar1[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>   }
+</span></span><span style="display:flex;"><span>   <span style="color:#66d9ef">return</span> puVar1;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>This function contains a very important clue, another string: <code>BN_F_BN_NEW,_ERR_R_M</code>, does BN stand for BigNum? Would make sense if we assume that RSA is used here. A quick google leads us to openSSL 1.0.1c. The value <code>BN_F_BN_NEW</code> is contained there as a macro. Inside of <code>FUN_8000e4e4</code> strings help us out again, with <code>Allocation failed</code>. What we have here is a function which seems to allocate 20 bytes and initialize the allocated memory.</p>
+<p>Notice that in [F0], the allocated memory is used and it also calls the same allocation routine as in [F1], <code>FUN_8000e4e4</code>.</p>
+<h3 id="f2">[F2]</h3>
+<p>This is just <code>memcpy</code>, copying whatever is at <code>DAT_80023b20</code> into <code>uVar3</code>, which is pointed to by the memory allocated in [F1]. As it turns out, the data at <code>DAT_80023b20</code> is initialized, looks random and has a size of 0x204 bytes.</p>
+<h3 id="f3">[F3]</h3>
+<p>Here, we have 0x10001, which is usually used as a RSA public exponent $e$. Again, before this value shows up, something is allocated and values are set in the allocated memory. This leads me to draw the following conclusion.</p>
+<h3 id="section-1">SECTION 1</h3>
+<p>The routines in the area of section 1 in the code [F0] seem to allocate bignums and load values into them. A first bignum is created, 0x204 bytes are loaded into it, the bignum value, after that, a second bignum with the value 0x10001 is created.</p>
+<h3 id="section-2">SECTION 2</h3>
+<p>Now comes a part that&rsquo;s a little trickier. If you follow the decompiled code, you can see that seemingly the bignums that were allocated aren&rsquo;t used anywhere. The assembly however tells a different story, never trust the decompiler. To show you this, instead of going through the assembly, let&rsquo;s look at the initialization part of [F0]:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined auStack_68 [<span style="color:#ae81ff">8</span>];   <span style="color:#75715e">// &lt;= this is passed to the function in SECTION 2
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>undefined4 <span style="color:#f92672">*</span>local_60;       <span style="color:#75715e">// &lt;= this is bignum0
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>undefined4 <span style="color:#f92672">*</span>local_5c;       <span style="color:#75715e">// &lt;= this is bignum1
+</span></span></span></code></pre></div><p>Looks like <code>local_60</code> and <code>local_5c</code> are seens as two independent values, while they are actually to be seen as part of <code>auStack_68</code> and passed to <code>FUN_80019eec</code> in SECTION 2 via a pointer to <code>auStack_68</code>. Looking inside <code>FUN_80019eec</code> confirms this.</p>
+<h3 id="enter-montgomery">Enter Montgomery</h3>
+<p>Below is the function, called with the arguments <code>iVar5 = FUN_80019eec(a_n512,a_512buffer,a_AES_KEY,auStack_68,1)</code>. So, we pass in the number 512, the 512 byte buffer, what we assume will be the decrypted AES key, the bignums as part of a buffer, most likely this is a struct and the number 1.</p>
+<pre tabindex="0"><code>undefined4 FUN_80019eec(int param_1,undefined4 param_2,undefined4 param_3,int param_4,int param_5)
+{
+   int iVar1;
+   int iVar2;
+   uint **ppuVar3;
+   int iVar4;
+   int iVar5;
+   undefined4 uVar6;
+   undefined4 uVar7;
+   int iVar8;
+
+// SECTION 3 START 
+   iVar1 = FUN_80015e28(*(undefined4 *)(param_4 + 8));
+   if ((0x4000 &lt; iVar1) ||
+       (iVar1 = FUN_80015cc0(*(undefined4 *)(param_4 + 8),*(undefined4 *)(param_4 + 0xc)), iVar1 &lt; 1))
+   {
+      return 0xffffffff;
+   }
+   iVar1 = FUN_80015e28(*(undefined4 *)(param_4 + 8));
+   if ((0xc00 &lt; iVar1) &amp;&amp; (iVar1 = FUN_80015e28(*(undefined4 *)(param_4 + 0xc)), 0x40 &lt; iVar1)) {
+      return 0xffffffff;
+   }
+// SECTION 3 END
+   iVar1 = FUN_8001468c();
+   if (iVar1 == 0) {
+      return 0xfffffffe;
+   }
+   FUN_800146dc(iVar1);
+   iVar2 = FUN_800147c8(iVar1);
+   ppuVar3 = (uint **)FUN_800147c8(iVar1);
+   iVar4 = FUN_80015e28(*(undefined4 *)(param_4 + 8));
+   iVar8 = iVar4 + 7;
+   if (iVar4 + 7 &lt; 0) {
+      iVar8 = iVar4 + 0xe;
+   }
+   iVar8 = iVar8 &gt;&gt; 3;
+   iVar4 = uc_alloc(iVar8);
+// SECTION 4 START
+   if ((((((iVar2 != 0) &amp;&amp; (ppuVar3 != (uint **)0x0)) &amp;&amp; (iVar4 != 0)) &amp;&amp;
+           ((param_1 &lt;= iVar8 &amp;&amp; (iVar5 = FUN_800165cc(param_2,param_1,iVar2), iVar5 != 0)))) &amp;&amp;
+         ((iVar5 = FUN_80015cc0(iVar2,*(undefined4 *)(param_4 + 8)), iVar5 &lt; 0 &amp;&amp;
+           (((*(uint *)(param_4 + 0x2c) &amp; 2) == 0 ||
+            (iVar5 = FUN_80016ab4(param_4 + 0x30,0,*(undefined4 *)(param_4 + 8),iVar1), iVar5 != 0))))))
+       &amp;&amp; (iVar2 = FUN_80015060(ppuVar3,iVar2,*(undefined4 *)(param_4 + 0xc),
+                                               *(undefined4 *)(param_4 + 8),iVar1,*(undefined4 *)(param_4 + 0x30)),
+            iVar2 != 0)) {
+// SECTION 4 END
+
+// SECTION 5 START
+      if ((param_5 != 5) || ((**ppuVar3 &amp; 0xf) == 0xc)) {
+         uVar6 = FUN_80016020(ppuVar3,iVar4);
+         uVar7 = 0xfffffffe;
+         if (param_5 == 1) {
+            uVar7 = FUN_80019e20(param_3,iVar8,iVar4,uVar6,iVar8);
+         }
+// SECTION 5 END
+         goto LAB_8001a0d4;
+      }
+--- SNIP ---
+</code></pre><p>First order of business: Find out what is going on with the buffer/struct passed in as the fourth parameter. We know that the struct must look like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> mystery {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint32_t</span> unk0;          <span style="color:#75715e">// offset 0x00
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">uint32_t</span> unk1;          <span style="color:#75715e">// offset 0x04
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">uint32_t</span> bignum0;       <span style="color:#75715e">// offset 0x08
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">uint32_t</span> bignum1;       <span style="color:#75715e">// offset 0x0c
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    ...
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Look at <strong>SECTION 3</strong>, here, <code>bignum0</code> is checked against some values. These are 16384 and 3072. Before, <code>bignum0</code> was passed to <code>FUN_80015e28</code>. After some reversing around, which was tedious, I discovered that this must be a function that determines how many bits a number has. This also makes sense from the program flow and the checks. Thus, I labled this function <code>uc_get_number_of_bits</code>. It seems probable that, if RSA is used, bignum0 is the modulus $N$ - we will see if this is true. As for as <code>bignum_1</code> is concerned, this must be the public exponent $e$ plainly because of it&rsquo;s value <code>0x10001</code>.</p>
+<p>The next step is to determine where the bignums and the input, the 512 byte buffer assumed to be the encrypted AES key, are used. For this, after some reversing, I found out the following in <strong>SECTION 4</strong>:</p>
+<p>First, <code>FUN_800165cc</code> converts the 512-byte input buffer to a bignum. Second, if we look inside of the function <code>FUN_80015060</code>, we see another string to help us out: <code>BN_mod_exp_mont_cons</code>. This is Montgomery modular exponentation in constant time. This functions is part of openSSL as well, but an internal function. If we look up the definition in the openSSL source code, we find the following definition:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">BN_mod_exp_mont_consttime</span>(BIGNUM <span style="color:#f92672">*</span>rr, <span style="color:#66d9ef">const</span> BIGNUM <span style="color:#f92672">*</span>a, <span style="color:#66d9ef">const</span> BIGNUM <span style="color:#f92672">*</span>p,
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> BIGNUM <span style="color:#f92672">*</span>m, BN_CTX <span style="color:#f92672">*</span>ctx,
+</span></span><span style="display:flex;"><span>    BN_MONT_CTX <span style="color:#f92672">*</span>in_mont)
+</span></span></code></pre></div><p>This tells us that the programmers of the firmware most likely took only the bignum part of openSSL and from there, exactly the functions they need without adding the full library.</p>
+<p>Thus, the calculation performed in <strong>SECTION 4</strong>, function <code>FUN_80015060</code> is:</p>
+<p>$$
+rr = a^e \mod N = (aes_key_{encrypted})^{0x10001} \mod N
+$$</p>
+<p>In a last step, the key decryption is finalized in <strong>SECTION 5</strong>. First, the function <code>FUN_80016020</code> is used to convert a bignum, the result $rr$, to a 512 byte buffer. In routine <code>FUN_80019e20</code> the plaintext is extracted. I will explain what I mean by that shortly, but first, the full control flow and the cleaned up disassembly:</p>
+<p><img src="/static/04_decryption_flow.png" alt=""></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined4
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">uc_calc_aes_key</span>(<span style="color:#66d9ef">int</span> a_RSASIZE,undefined4 a_RSAPUB,undefined4 a_<span style="color:#f92672">?</span>_AES_KEY,<span style="color:#66d9ef">int</span> a_struct_bn,<span style="color:#66d9ef">int</span> param_5)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> v_ctx;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> v_message;
+</span></span><span style="display:flex;"><span>  BIGNUM <span style="color:#f92672">*</span>rr;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> v_rr_bytes;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> var_ret;
+</span></span><span style="display:flex;"><span>  undefined4 uVar1;
+</span></span><span style="display:flex;"><span>  undefined4 v_plaintext_len;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> v_bytes_to_alloc;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* modulus m */</span>
+</span></span><span style="display:flex;"><span>  v_ctx <span style="color:#f92672">=</span> uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_get_num_bits</span>(<span style="color:#f92672">*</span>(BIGNUM <span style="color:#f92672">**</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>));
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* a_struct_bn + 0xc = e */</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> ((<span style="color:#ae81ff">16384</span> <span style="color:#f92672">&lt;</span> v_ctx) <span style="color:#f92672">||</span>
+</span></span><span style="display:flex;"><span>     (v_ctx <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_check_equal</span>(<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>),<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xc</span>)),
+</span></span><span style="display:flex;"><span>     v_ctx <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">1</span>)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0xffffffff</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  v_ctx <span style="color:#f92672">=</span> uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_get_num_bits</span>(<span style="color:#f92672">*</span>(BIGNUM <span style="color:#f92672">**</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>));
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> ((<span style="color:#ae81ff">3072</span> <span style="color:#f92672">&lt;</span> v_ctx) <span style="color:#f92672">&amp;&amp;</span> (v_ctx <span style="color:#f92672">=</span> uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_get_num_bits</span>(<span style="color:#f92672">*</span>(BIGNUM <span style="color:#f92672">**</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xc</span>)), <span style="color:#ae81ff">64</span> <span style="color:#f92672">&lt;</span> v_ctx)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0xffffffff</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* allocated and initialized to zero */</span>
+</span></span><span style="display:flex;"><span>  v_ctx <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_ctx_alloc_and_init</span>();
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (v_ctx <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0xfffffffe</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">openssl_bn_ctx_new</span>(v_ctx);
+</span></span><span style="display:flex;"><span>  v_message <span style="color:#f92672">=</span> <span style="color:#a6e22e">openssl_bn_ctx_init</span>(v_ctx);
+</span></span><span style="display:flex;"><span>  rr <span style="color:#f92672">=</span> (BIGNUM <span style="color:#f92672">*</span>)<span style="color:#a6e22e">openssl_bn_ctx_init</span>(v_ctx);
+</span></span><span style="display:flex;"><span>  v_rr_bytes <span style="color:#f92672">=</span> uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_get_num_bits</span>(<span style="color:#f92672">*</span>(BIGNUM <span style="color:#f92672">**</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>));
+</span></span><span style="display:flex;"><span>  v_bytes_to_alloc <span style="color:#f92672">=</span> v_rr_bytes <span style="color:#f92672">+</span> <span style="color:#ae81ff">7</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (v_rr_bytes <span style="color:#f92672">+</span> <span style="color:#ae81ff">7</span> <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    v_bytes_to_alloc <span style="color:#f92672">=</span> v_rr_bytes <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xe</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* this is bits to bytes */</span>
+</span></span><span style="display:flex;"><span>  v_bytes_to_alloc <span style="color:#f92672">=</span> v_bytes_to_alloc <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">3</span>;
+</span></span><span style="display:flex;"><span>  v_rr_bytes <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_alloc</span>(v_bytes_to_alloc);
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                                                     const BIGNUM *m, BN_CTX *ctx,
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                                                     BN_MONT_CTX *in_mont);
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                       p = 0x10001
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                       m = modulus */</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> ((((((v_message <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (rr <span style="color:#f92672">!=</span> (BIGNUM <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) <span style="color:#f92672">&amp;&amp;</span> (v_rr_bytes <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>       ((a_RSASIZE <span style="color:#f92672">&lt;=</span> v_bytes_to_alloc <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>        (var_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_lebin2bn</span>(a_RSAPUB,a_RSASIZE,v_message), var_ret <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)))) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>      ((var_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_check_equal</span>(v_message,<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>)), var_ret <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>       (((<span style="color:#f92672">*</span>(uint <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">44</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">2</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">||</span>
+</span></span><span style="display:flex;"><span>        (var_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_setup_mont_ctx</span>(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x30</span>,<span style="color:#ae81ff">0</span>,<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>),v_ctx),
+</span></span><span style="display:flex;"><span>        var_ret <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)))))) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>     (v_message <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_mod_exp_mont_consttime</span>
+</span></span><span style="display:flex;"><span>                            (rr,v_message,<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xc</span>),
+</span></span><span style="display:flex;"><span>                             <span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>),v_ctx,
+</span></span><span style="display:flex;"><span>                             <span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(a_struct_bn <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x30</span>)), v_message <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)) {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ((param_5 <span style="color:#f92672">!=</span> <span style="color:#ae81ff">5</span>) <span style="color:#f92672">||</span> ((<span style="color:#f92672">*</span>rr<span style="color:#f92672">-&gt;</span>d <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xf</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0xc</span>)) {
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* returns a number of bits/bytes.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                       either way, a length value. */</span>
+</span></span><span style="display:flex;"><span>      uVar1 <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_copy_bn_to_buf</span>(rr,v_rr_bytes);
+</span></span><span style="display:flex;"><span>      v_plaintext_len <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xfffffffe</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (param_5 <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span>) { <span style="color:#75715e">// NOTE: param_5 is set to 1 by the caller
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        v_plaintext_len <span style="color:#f92672">=</span>
+</span></span><span style="display:flex;"><span>             <span style="color:#a6e22e">uc_extract_plaintext</span>(a_<span style="color:#f92672">?</span>_AES_KEY,v_bytes_to_alloc,v_rr_bytes,uVar1,v_bytes_to_alloc);
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">goto</span> LABEL_DONE;
+</span></span><span style="display:flex;"><span>    }
+</span></span></code></pre></div><h2 id="plaintext-extraction">Plaintext Extraction</h2>
+<p>In the section before, I mentioned that <code>FUN_80019e20</code> (relabled as <code>uc_extract_plaintext</code>) is significant. This function gets us the final plaintext AES key after decryption. The reason I want to highlight this function here, is because it aids with reverse engineering. Here&rsquo;s the cleaned-up disassembly:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">uc_extract_plaintext</span>(undefined4 a_result,<span style="color:#66d9ef">int</span> a_<span style="color:#f92672">?</span>_len0,<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>a_rr,<span style="color:#66d9ef">int</span> v_bufsize,<span style="color:#66d9ef">int</span> a_<span style="color:#f92672">?</span>_len1)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> i;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> p_ch;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>vp_rr;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>vp_rr_current;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> v_len;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> ii;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> ((v_bufsize <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span> <span style="color:#f92672">==</span> a_<span style="color:#f92672">?</span>_len1) <span style="color:#f92672">&amp;&amp;</span> (vp_rr <span style="color:#f92672">=</span> a_rr <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>, <span style="color:#f92672">*</span>a_rr <span style="color:#f92672">==</span> <span style="color:#ae81ff">0x1</span>)) { <span style="color:#75715e">// &lt;= [G0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    v_len <span style="color:#f92672">=</span> v_bufsize <span style="color:#f92672">+</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#ae81ff">0</span> <span style="color:#f92672">&lt;</span> v_len) {
+</span></span><span style="display:flex;"><span>      p_ch <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>vp_rr;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (p_ch <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>) { 
+</span></span><span style="display:flex;"><span>        ii <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>          vp_rr_current <span style="color:#f92672">=</span> vp_rr;
+</span></span><span style="display:flex;"><span>          i <span style="color:#f92672">=</span> ii;
+</span></span><span style="display:flex;"><span>          vp_rr <span style="color:#f92672">=</span> vp_rr_current <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">if</span> (v_len <span style="color:#f92672">&lt;=</span> i) <span style="color:#66d9ef">goto</span> LABEL_DONE;
+</span></span><span style="display:flex;"><span>          p_ch <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>vp_rr;
+</span></span><span style="display:flex;"><span>          ii <span style="color:#f92672">=</span> i <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">while</span> (p_ch <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        vp_rr <span style="color:#f92672">=</span> vp_rr_current <span style="color:#f92672">+</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>        vp_rr <span style="color:#f92672">=</span> a_rr <span style="color:#f92672">+</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (p_ch <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#39;\0&#39;</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>LABEL_DONE:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (((i <span style="color:#f92672">!=</span> v_len) <span style="color:#f92672">&amp;&amp;</span> (<span style="color:#ae81ff">7</span> <span style="color:#f92672">&lt;</span> i)) <span style="color:#f92672">&amp;&amp;</span> (i <span style="color:#f92672">=</span> (v_bufsize <span style="color:#f92672">+</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">2</span>) <span style="color:#f92672">-</span> i, i <span style="color:#f92672">&lt;=</span> a_<span style="color:#f92672">?</span>_len0)) {
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">uc_memcpy</span>(a_result,vp_rr,i);  <span style="color:#75715e">// &lt;= [G1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      <span style="color:#66d9ef">return</span> i;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The result of the decryption is denoted as <code>a_rr</code>, notice label <code>[G0]</code>. The first byte, that is the most-significant byte of <code>a_rr</code>, must be equal to <code>0x01</code> for the plaintext to be successfully extracted by the memcopy at label <code>[G1]</code>. The rest is just skipping bytes. If you look at the loop above label <code>[G1]</code>, you will see that all bytes equal to <code>0xff</code> are skipped. Thus, a correctly decrypted key must look like this:</p>
+<pre tabindex="0"><code>                     |-------- Plaintext -------|  
+0x01, 0xff .... 0xff, 0xde, 0xad .... 0xbe, 0xef
+</code></pre><p>That is another clue we can use to our advantage. Besides that the function above also determines the plaintext&rsquo;s length.</p>
+<h2 id="further-key-derivation">Further Key Derivation</h2>
+<p>Now we are back at the call to <code>FUN_80019780</code> (relabled to <code>uc_decode</code>). Right at the beginning (<em>[Screenshot 1]</em>), here&rsquo;s the cleaned up disassembly:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* we decrypted the AES key with this routine */</span>
+</span></span><span style="display:flex;"><span>v_AES_KEY <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_decode</span>(<span style="color:#f92672">&amp;</span>g_ENCR_AES_KEY,<span style="color:#ae81ff">0x200</span>,v_<span style="color:#f92672">?</span>_aeskey,<span style="color:#f92672">&amp;</span>v_len);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (v_AES_KEY <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* SECTION 6 START */</span>
+</span></span><span style="display:flex;"><span>v_AES_KEY <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_alloc</span>(v_len <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">uc_memcpy</span>(v_AES_KEY,v_<span style="color:#f92672">?</span>_aeskey,v_len);
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* SECTION 6 END */</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">*</span>(undefined <span style="color:#f92672">*</span>)(v_AES_KEY <span style="color:#f92672">+</span> v_len <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (((g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (_g_FPTR_PRINT_DEBUG <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>    (<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(s_aes_key<span style="color:#f92672">=</span>_80026e14);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (v_len <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (((g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (_g_FPTR_PRINT_DEBUG <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>        (<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(<span style="color:#f92672">&amp;</span>g_fmt_<span style="color:#f92672">%</span>c,v_<span style="color:#f92672">?</span>_aeskey[i]);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">=</span> i <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">while</span> (i <span style="color:#f92672">&lt;</span> v_len);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (((g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (_g_FPTR_PRINT_DEBUG <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>    (<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(s_Usage:_strap_bit_value_800269b8 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x18</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>v_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_decode</span>(a_img <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>,<span style="color:#ae81ff">0x200</span>,v_<span style="color:#f92672">?</span>_aeskey,<span style="color:#f92672">&amp;</span>v_len);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> (v_ret <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_calc_digest</span>(a_img <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x81</span>,v_image_size <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x200</span>,v_hashval);
+</span></span><span style="display:flex;"><span>    v_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_strncmp</span>(v_hashval,auStack_661,v_len <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x13</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (v_ret <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    local_678 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* offset 0x204 into binary, this is &#34;Salted__&#34; */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    v_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_aes_cbc_decrypt</span>(a_img <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x81</span>,v_image_size <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x200</span>,v_AES_KEY,<span style="color:#ae81ff">0x40</span>,<span style="color:#ae81ff">0xa4000000</span>, <span style="color:#f92672">&amp;</span>local_678);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (v_ret <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* omitted */</span>
+</span></span></code></pre></div><p>After the AES key is decrypted, it is copied to a separate buffer, <code>v_AES_KEY</code> (<strong>SECTION 6</strong>). This is then used below in the function <code>uc_aes_cbc_decrypt</code>. The rest of the functions are not important when it comes to decrypting the firmware, as such, I&rsquo;ll skip these and we&rsquo;ll dive into <code>uc_aes_cbc_decrypt</code> next, first the call:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>v_ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_aes_cbc_decrypt</span>(a_img <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x81</span>,v_image_size <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x200</span>,v_AES_KEY,<span style="color:#ae81ff">0x40</span>,<span style="color:#ae81ff">0xa4000000</span>, <span style="color:#f92672">&amp;</span>local_678);
+</span></span></code></pre></div><p>Note that a_img is the encrypted firmware image blob, the image begins with metadata, 0x200 bytes in length, as such, this is subtracted. The AES key is passed in, together with the constant <code>0x40</code>. I assume that <code>0xa4000000</code> is where the decrypted image will end up, however, we don&rsquo;t care about that, same goes for <code>local_678</code>. There is one thing to note here regarding the first parameter <code>a_img</code>. The offset added, <code>0x81</code>, is to be interpreted as a 32-bit offset. That means, <code>0x81 * 4 == 0x204</code> bytes are added to <code>a_img</code>. Inside <code>uc_aes_cbc_decrypt</code>, we see this offset of 0x204, again, the function was annotated by me:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined4
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">uc_aes_cbc_decrypt</span>(<span style="color:#66d9ef">int</span> img_204,<span style="color:#66d9ef">int</span> param_2,undefined4 AES_KEY,undefined4 bytes_64,undefined4 a_addr<span style="color:#f92672">?</span>
+</span></span><span style="display:flex;"><span>                  ,<span style="color:#66d9ef">int</span> <span style="color:#f92672">*</span>param_6)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">int</span> iVar1;
+</span></span><span style="display:flex;"><span>  undefined <span style="color:#f92672">*</span>v_ptr;
+</span></span><span style="display:flex;"><span>  uint uVar2;
+</span></span><span style="display:flex;"><span>  undefined4 <span style="color:#f92672">*</span>puVar3;
+</span></span><span style="display:flex;"><span>  undefined aes_key [<span style="color:#ae81ff">16</span>];
+</span></span><span style="display:flex;"><span>  undefined auStack_1f8 [<span style="color:#ae81ff">48</span>];
+</span></span><span style="display:flex;"><span>  undefined AES_KEY_FINAL [<span style="color:#ae81ff">64</span>];
+</span></span><span style="display:flex;"><span>  undefined AES_IV [<span style="color:#ae81ff">16</span>];
+</span></span><span style="display:flex;"><span>  undefined MD5_CTX [<span style="color:#ae81ff">92</span>];
+</span></span><span style="display:flex;"><span>  undefined4 AES_CTX [<span style="color:#ae81ff">61</span>];
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  iVar1 <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_strncmp</span>(img_204,s_Salted___80026d54,<span style="color:#ae81ff">8</span>);    <span style="color:#75715e">// &lt;= [H0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* omitted */</span>
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_init</span>(MD5_CTX);                               <span style="color:#75715e">// &lt;= [H1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#a6e22e">uc_md5_update</span>(MD5_CTX,AES_KEY,bytes_64);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_update</span>(MD5_CTX,img_204 <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>,<span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_finalize</span>(AES_KEY_FINAL,MD5_CTX);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_memcpy</span>(aes_key,AES_KEY_FINAL,<span style="color:#ae81ff">0x10</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_init</span>(MD5_CTX);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_update</span>(MD5_CTX,AES_KEY_FINAL,<span style="color:#ae81ff">0x10</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_update</span>(MD5_CTX,AES_KEY,bytes_64);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_update</span>(MD5_CTX,img_204 <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>,<span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_md5_finalize</span>(AES_KEY_FINAL,MD5_CTX);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_memcpy</span>(AES_IV,AES_KEY_FINAL,<span style="color:#ae81ff">0x10</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* omitted */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">uc_memset</span>(AES_CTX,<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">0xf4</span>);
+</span></span><span style="display:flex;"><span>    iVar1 <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_aes_init_key</span>(aes_key,AES_CTX,<span style="color:#ae81ff">0</span>);         <span style="color:#75715e">// &lt;= [H2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> (iVar1 <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (((g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span> (_g_FPTR_PRINT_DEBUG <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>        (<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(s_gen_key:_80026d78);
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      puVar3 <span style="color:#f92672">=</span> AES_CTX;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* omitted */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> ((((g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#f92672">&amp;&amp;</span>
+</span></span><span style="display:flex;"><span>          ((_g_FPTR_PRINT_DEBUG <span style="color:#f92672">==</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span> <span style="color:#f92672">||</span>
+</span></span><span style="display:flex;"><span>           ((<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(s_Usage:_strap_bit_value_800269b8 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x18</span>), (g_DEBUG_ON <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>           ))) <span style="color:#f92672">&amp;&amp;</span> (_g_FPTR_PRINT_DEBUG <span style="color:#f92672">!=</span> (code <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x0</span>)) {
+</span></span><span style="display:flex;"><span>        (<span style="color:#f92672">*</span>_g_FPTR_PRINT_DEBUG)(s_cbc128data:<span style="color:#ae81ff">0</span>x<span style="color:#f92672">%</span>x_80026d8c,<span style="color:#f92672">*</span>(undefined4 <span style="color:#f92672">*</span>)(img_204 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>));
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_cbc128_decrypt</span>((undefined4 <span style="color:#f92672">*</span>)(img_204 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>),a_addr<span style="color:#f92672">?</span>,param_2 <span style="color:#f92672">+</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">0x10</span>,AES_CTX,AES_IV); <span style="color:#75715e">// &lt;= [H3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      <span style="color:#f92672">*</span>param_6 <span style="color:#f92672">=</span> param_2 <span style="color:#f92672">+</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* omitted */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>I omitted some code here, because the disassembly looks horrible. Starting at label <code>[H0]</code>, the image is checked for the string <em>Salted__</em> at offset `0x204``, exactly 8 bytes in length. Here&rsquo;s a hexdump of the image:</p>
+<pre tabindex="0"><code>000001E0   F7 C7 80 CE  9C 70 D2 6C  AC 52 03 30  5A 18 48 95  .....p.l.R.0Z.H.
+000001F0   5C 96 28 38  11 CF 89 7C  92 43 7E 87  29 48 47 A2  \.(8...|.C~.)HG.
+00000200   19 FF 76 47  53 61 6C 74  65 64 5F 5F  xx xx xx xx  ..vGSalted__xxxx
+00000210   xx xx xx xx                                         xxxx
+</code></pre><p>Following <em>Salted__</em> is the 8-byte salt value, omitted here, marked by &ldquo;xx&rdquo;. Next up is the sequence of operations starting at <code>[H1]</code>. Here, the MD5 hash algorithms is used to take the decrypted AES key and derive the <strong>actual</strong> key and an IV for AES. Looks like the vendor bamboozled us a little. I identified MD5 simply by looking into the function I labled as <code>uc_md5_init</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">uc_md5_init</span>(undefined4 <span style="color:#f92672">*</span>param_1)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">uc_memset</span>(param_1,<span style="color:#ae81ff">0</span>,<span style="color:#ae81ff">0x5c</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>param_1 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x67452301</span>;
+</span></span><span style="display:flex;"><span>  param_1[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xefcdab89</span>;
+</span></span><span style="display:flex;"><span>  param_1[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x98badcfe</span>;
+</span></span><span style="display:flex;"><span>  param_1[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x10325476</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>From the constants used, it&rsquo;s pretty clear that MD5 is used. As is usual, after a context for the hash algorithm is initialized, a &ldquo;update&rdquo; function adds data to the hash, which is finalized by &ldquo;finalize&rdquo; function. This is exactly what happens here. As you can see from the code, this is how the key and IV are derived:</p>
+<p><img src="/static/05_key_derivation.png" alt=""></p>
+<p>The AES key decrypted by the Montgomery exponentiation is passed to MD5 along with the salt value from the firmware image, resulting in the <em>derived AES key</em>. MD5 is applied to this key, following the decrypted key and salt again. The final result is the IV for AES, <em>derived AES IV</em>. Note that only 0x40 bytes of the decrypted AES key are used with MD5, not the full key! I don&rsquo;t know why this is, as the decrypted key is actually longer, but whatever&hellip;</p>
+<h2 id="confirmation">Confirmation</h2>
+<p>Now the reversing part is done, time to test all of this. To get started, I extracted the following from the flash dump and the firmware image:</p>
+<ul>
+<li>$N$ the RSA modulus (dump)</li>
+<li>the encrypted AES key (dump)</li>
+<li>Salt value (downloaded firmware image)</li>
+</ul>
+<p>Next, I re-implemented the decryption and key derivation procedure in C:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdio.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdlib.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdint.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;string.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;assert.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;openssl/bn.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;openssl/md5.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* this is the modulus */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">uint8_t</span> g_MODULUS[<span style="color:#ae81ff">0x200</span>] <span style="color:#f92672">=</span> { ... };
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* public exponent */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">uint32_t</span> g_PUBEXP <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x00010001</span>;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* taken from the flash dump this is the encrypted AES key */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">uint8_t</span> g_A[<span style="color:#ae81ff">0x200</span>] <span style="color:#f92672">=</span> { ... };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* re-implementation of the function found in the flash dump */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">extract_plaintext</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>p_buffer, <span style="color:#66d9ef">int</span> buflen, <span style="color:#66d9ef">size_t</span> <span style="color:#f92672">*</span>keylen)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; 
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> ii <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> c <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>p <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>p_buffer[<span style="color:#ae81ff">1</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>vp_rr <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>p_buffer[<span style="color:#ae81ff">1</span>];
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>vp_rr_current <span style="color:#f92672">=</span> NULL;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>p_key <span style="color:#f92672">=</span> NULL;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* always start at the second byte, the first byte is checked and must 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">     * be 0x01 in order for the routine to execute successfully */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(p_buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0x01</span>) 
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;error extract_plaintext: first byte != 0x01</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#f92672">*</span>p <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>) 
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        ii <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">do</span> 
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            vp_rr_current <span style="color:#f92672">=</span> vp_rr;
+</span></span><span style="display:flex;"><span>            i <span style="color:#f92672">=</span> ii;
+</span></span><span style="display:flex;"><span>            vp_rr <span style="color:#f92672">=</span> vp_rr_current <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> (buflen <span style="color:#f92672">&lt;=</span> i) 
+</span></span><span style="display:flex;"><span>            {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">goto</span> LABEL_EXTRACT_DONE;
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span>p <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>vp_rr;
+</span></span><span style="display:flex;"><span>            ii <span style="color:#f92672">=</span> i <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        } 
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">while</span> (<span style="color:#f92672">*</span>p <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        vp_rr <span style="color:#f92672">=</span> vp_rr_current <span style="color:#f92672">+</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span> 
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        vp_rr <span style="color:#f92672">=</span> p_buffer <span style="color:#f92672">+</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (<span style="color:#f92672">*</span>p <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#39;\0&#39;</span>) 
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;extract_plaintext: error, *p != NULL</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">return</span> NULL;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>keylen <span style="color:#f92672">=</span> buflen <span style="color:#f92672">-</span> <span style="color:#ae81ff">2</span> <span style="color:#f92672">-</span> i;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    p_key <span style="color:#f92672">=</span> <span style="color:#a6e22e">malloc</span>(<span style="color:#f92672">*</span>keylen);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">memcpy</span>(p_key, vp_rr, <span style="color:#f92672">*</span>keylen);
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>LABEL_EXTRACT_DONE:
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> p_key;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">main</span>(<span style="color:#66d9ef">int</span> argc, <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>argv[])
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> ret <span style="color:#f92672">=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>str <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">size_t</span> key_size <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>p_key <span style="color:#f92672">=</span> NULL;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    BIGNUM <span style="color:#f92672">*</span>rr <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_new</span>();
+</span></span><span style="display:flex;"><span>    BIGNUM <span style="color:#f92672">*</span>a  <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_new</span>();
+</span></span><span style="display:flex;"><span>    BIGNUM <span style="color:#f92672">*</span>p  <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_new</span>();
+</span></span><span style="display:flex;"><span>    BIGNUM <span style="color:#f92672">*</span>m  <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_new</span>();
+</span></span><span style="display:flex;"><span>    BN_CTX <span style="color:#f92672">*</span>ctx <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_CTX_new</span>();
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> a_buf[<span style="color:#ae81ff">0x200</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">size_t</span> size <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>data <span style="color:#f92672">=</span> <span style="color:#a6e22e">read_file</span>(<span style="color:#e6db74">&#34;firmware_image&#34;</span>, <span style="color:#f92672">&amp;</span>size);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">memcpy</span>(a_buf, (<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)data<span style="color:#f92672">+</span><span style="color:#ae81ff">4</span>, <span style="color:#ae81ff">0x200</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* calculate rr = a^p % m */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* encrypted key to bignum */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">BN_bin2bn</span>(g_A, <span style="color:#ae81ff">0x200</span>, a);
+</span></span><span style="display:flex;"><span>    str <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_bn2hex</span>(a);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;a: %s</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, str);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">OPENSSL_free</span>(str);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* modulus to bignum */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">BN_lebin2bn</span>(g_MODULUS, <span style="color:#ae81ff">0x200</span>, m);
+</span></span><span style="display:flex;"><span>    str <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_bn2hex</span>(m);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;m: %s</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, str);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">OPENSSL_free</span>(str);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* public exponent to bignum */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">const</span> <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>p_str <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;10001</span><span style="color:#ae81ff">\0</span><span style="color:#e6db74">&#34;</span>;
+</span></span><span style="display:flex;"><span>    ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_hex2bn</span>(<span style="color:#f92672">&amp;</span>p, p_str);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;ret = %d</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, ret);
+</span></span><span style="display:flex;"><span>    str <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_bn2hex</span>(p);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;p: %s</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, str);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/*  BN_mod_exp is a wrapper and internally calls BN_mod_exp_mont_consttime
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                                const BIGNUM *m, BN_CTX *ctx,
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">                                BN_MONT_CTX *in_mont);
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
+</span></span><span style="display:flex;"><span>    ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_mod_exp</span>(rr, a, p, m, ctx);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;ret = %d</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, ret);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">assert</span>(ret <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    str <span style="color:#f92672">=</span> <span style="color:#a6e22e">BN_bn2hex</span>(rr);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;rr: %s</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, str);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> rr_buffer_be[<span style="color:#ae81ff">0x200</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* bignum to buffer, rr_buffer_be contains the decrypted key */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">BN_bn2bin</span>(rr, <span style="color:#f92672">&amp;</span>rr_buffer_be[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>rr_buffer <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>rr_buffer_be[<span style="color:#ae81ff">0</span>];
+</span></span><span style="display:flex;"><span>    p_key <span style="color:#f92672">=</span> <span style="color:#a6e22e">extract_plaintext</span>(<span style="color:#f92672">&amp;</span>rr_buffer_be[<span style="color:#ae81ff">0</span>], <span style="color:#ae81ff">0x200</span>, <span style="color:#f92672">&amp;</span>key_size);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;DEBUG: extracted key of %d bytes</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, key_size);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* 2. take the salt from the firmware image, to produce md5 hash */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> salt[<span style="color:#ae81ff">8</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">memcpy</span>(salt, ((<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)data)<span style="color:#f92672">+</span><span style="color:#ae81ff">0x204</span><span style="color:#f92672">+</span><span style="color:#ae81ff">8</span>, <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;SALT: </span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    MD5_CTX md5 <span style="color:#f92672">=</span> {<span style="color:#ae81ff">0</span>};
+</span></span><span style="display:flex;"><span>    MD5_CTX <span style="color:#f92672">*</span>ctx_md5 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>md5;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">MD5_Init</span>(ctx_md5);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#f92672">!</span>ret)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">printf</span>(<span style="color:#e6db74">&#34;MD5_init failed</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* 3. perform key derivation */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> aes_key[<span style="color:#ae81ff">16</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>p_key_derive <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)p_key;
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Update</span>(ctx_md5, (<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span>)p_key_derive, <span style="color:#ae81ff">0x40</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Update</span>(ctx_md5, (<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>salt[<span style="color:#ae81ff">0</span>], <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Final</span>(<span style="color:#f92672">&amp;</span>aes_key[<span style="color:#ae81ff">0</span>], ctx_md5);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    MD5_CTX ctx_iv <span style="color:#f92672">=</span> {<span style="color:#ae81ff">0</span>};
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">char</span> iv[<span style="color:#ae81ff">16</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span>    ret <span style="color:#f92672">=</span> <span style="color:#a6e22e">MD5_Init</span>(<span style="color:#f92672">&amp;</span>ctx_iv);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Update</span>(<span style="color:#f92672">&amp;</span>ctx_iv, (<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>aes_key[<span style="color:#ae81ff">0</span>], <span style="color:#ae81ff">16</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Update</span>(<span style="color:#f92672">&amp;</span>ctx_iv, (<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span>)p_key_derive, <span style="color:#ae81ff">0x40</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Update</span>(<span style="color:#f92672">&amp;</span>ctx_iv, (<span style="color:#66d9ef">const</span> <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>salt[<span style="color:#ae81ff">0</span>], <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">MD5_Final</span>(<span style="color:#f92672">&amp;</span>iv[<span style="color:#ae81ff">0</span>], <span style="color:#f92672">&amp;</span>ctx_iv);
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* omitted: print keys */</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">free</span>(data);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>This program spews out the key and IV. I used a simple python script with <code>pycryptodome</code> to implement AES-CBC-128 with the derived key and IV and let it loose on the downloaded firmware image. This is what I got:</p>
+<pre tabindex="0"><code>DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+10840         0x2A58          LZMA compressed data, properties: 0x5D, dictionary size: 8388608 bytes, uncompressed size: 5681796 bytes
+</code></pre><p>The entropy is very high still, as the data is compressed with LZMA:</p>
+<p><img src="/static/entropy_00.png" alt=""></p>
+<p>After decompressing the LZMA part, this was the resulting entropy graph:</p>
+<p><img src="/static/entropy_01.png" alt=""></p>
+<p>That looks very good. I went through the decrypted blob with a hex editor to discover distinct parts and patterns, I saw that there&rsquo;s even an ELF header with code contained in the blob. After a little bit of carving and checking, I found lots of valid MIPS 32 LE code. I carved out distinct parts, the first parts with the MIPS32 LE instructions was imported into Ghidra, let&rsquo;s see what we got!</p>
+<p>Looks like the decryption worked, we got strings, and sane code which can be reversed next. Here&rsquo;s a snippet:</p>
+<p><img src="/static/06_decrypted_image.png" alt=""></p>
+<h2 id="conclusion">Conclusion</h2>
+<p>With the firmware successfully decrypted, the next part of the journey begins. The main firmware blob is not an ELF binary, thus it is imported raw into Ghidra and as at the very start, the hunt for the image base address starts again. I hope this blog post gave an insight into the thought process and reverse engineering and decryptin of an encrypted firmware image. Of course, this approach and the way the encryption was done is not universal, but I hope you can take something from this. Lots of times, firmware binaries are only &ldquo;encrypted&rdquo; with XOR and &ldquo;decryption&rdquo; is trivial. Here, the decryption was more of a challenge. What aided us here was the debug information contained in the binary. That is not always the case, making things much harder to reverse engineer, but not impossible.</p>
+<p>As far as reversing the <em>decrypted firmware</em> goes, I still have not started, but will do so in the future. Stay tuned. If you got this far, I wish you all the best, have a good day :^)</p>
+<h2 id="references">References</h2>
+<p>[0] <a href="https://www.flashrom.org/">https://www.flashrom.org/</a></p>
+<p>[1] asprogrammer <a href="https://github.com/nofeletru/UsbAsp-flash/releases">https://github.com/nofeletru/UsbAsp-flash/releases</a></p>
+<p>[2] binwalk <a href="https://github.com/ReFirmLabs/binwalk">https://github.com/ReFirmLabs/binwalk</a></p>
+<p>[3] openSSL doxygen <a href="https://docs.huihoo.com/doxygen/openssl/1.0.1c/crypto_2bn_2bn_8h.html">https://docs.huihoo.com/doxygen/openssl/1.0.1c/crypto_2bn_2bn_8h.html</a></p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

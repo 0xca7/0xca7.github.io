@@ -286,31 +286,31 @@ read_sensor(uint8_t *p_buf)
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(timer_get_flag(TIM2, TIM_SR_CC1IF))
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#a6e22e">timer_get_flag</span>(TIM2, TIM_SR_CC1IF))
 </span></span><span style="display:flex;"><span>    {
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* clear the interrupt */</span>
-</span></span><span style="display:flex;"><span>        timer_clear_flag(TIM2, TIM_SR_CC1IF);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">timer_clear_flag</span>(TIM2, TIM_SR_CC1IF);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* read from the sensor */</span>
-</span></span><span style="display:flex;"><span>        read_sensor(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">read_sensor</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* filter data */</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to fixed point */</span>
 </span></span><span style="display:flex;"><span>        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* add to buffer */</span>
-</span></span><span style="display:flex;"><span>        circ_buf_put(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* convolution */</span>
-</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> circ_buf_convolution(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> <span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to raw bytes */</span>
 </span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
 </span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* send what we read via UART */</span>
-</span></span><span style="display:flex;"><span>        send_data(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">send_data</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
-</span></span><span style="display:flex;"><span>        gpio_toggle(GPIOC, GPIO13);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">gpio_toggle</span>(GPIOC, GPIO13);
 </span></span><span style="display:flex;"><span>    } <span style="color:#75715e">/* if */</span>
 </span></span><span style="display:flex;"><span>}
 </span></span></code></pre></div><p>Now for the last two parts.</p>
@@ -378,17 +378,17 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint16_t</span> q[CIRC_BUFFER_SIZE];
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint8_t</span> head;
 </span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>circ_buf_t;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">circ_buf_t</span>;
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief filter coefficients */</span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> fp16 g_fcoeff[CIRC_BUFFER_SIZE] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief circ buffer used for filtering */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> circ_buf_t g_cbuf <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">circ_buf_t</span> g_cbuf <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief initialize the buffer to a reset state */</span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_init</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_init</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
@@ -399,12 +399,12 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>fp16
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_convolution</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf, fp16 <span style="color:#f92672">*</span>h)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf, fp16 <span style="color:#f92672">*</span>h)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> cursor <span style="color:#f92672">=</span> p_buf<span style="color:#f92672">-&gt;</span>head;
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    fp16 res <span style="color:#f92672">=</span> FLOAT2FIXED16(<span style="color:#ae81ff">0.0</span>);
+</span></span><span style="display:flex;"><span>    fp16 res <span style="color:#f92672">=</span> <span style="color:#a6e22e">FLOAT2FIXED16</span>(<span style="color:#ae81ff">0.0</span>);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
 </span></span><span style="display:flex;"><span>    {
@@ -413,15 +413,15 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>        {
 </span></span><span style="display:flex;"><span>            cursor <span style="color:#f92672">=</span> CIRC_BUFFER_SIZE<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
 </span></span><span style="display:flex;"><span>        }
-</span></span><span style="display:flex;"><span>        res <span style="color:#f92672">=</span> fp16_add(res, 
-</span></span><span style="display:flex;"><span>            fp16_mul(p_buf<span style="color:#f92672">-&gt;</span>q[cursor], <span style="color:#f92672">*</span>(h<span style="color:#f92672">+</span>i)));
+</span></span><span style="display:flex;"><span>        res <span style="color:#f92672">=</span> <span style="color:#a6e22e">fp16_add</span>(res, 
+</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">fp16_mul</span>(p_buf<span style="color:#f92672">-&gt;</span>q[cursor], <span style="color:#f92672">*</span>(h<span style="color:#f92672">+</span>i)));
 </span></span><span style="display:flex;"><span>    }
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> res;
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_put</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf, <span style="color:#66d9ef">uint16_t</span> val)
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf, <span style="color:#66d9ef">uint16_t</span> val)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>    p_buf<span style="color:#f92672">-&gt;</span>q[p_buf<span style="color:#f92672">-&gt;</span>head] <span style="color:#f92672">=</span> val;
 </span></span><span style="display:flex;"><span>
@@ -442,13 +442,13 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">clock_setup</span>(<span style="color:#66d9ef">void</span>)
 </span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_GPIOA);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_GPIOB);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_GPIOC);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_AFIO);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_I2C1);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_USART1);
-</span></span><span style="display:flex;"><span>	rcc_periph_clock_enable(RCC_TIM2);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOA);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOB);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOC);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_AFIO);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_I2C1);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_USART1);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_TIM2);
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/**
@@ -461,24 +461,24 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* Set alternate functions for the SCL and SDA pins of I2C1. */</span>
-</span></span><span style="display:flex;"><span>	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">gpio_set_mode</span>(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
 </span></span><span style="display:flex;"><span>		      GPIO_CNF_OUTPUT_ALTFN_OPENDRAIN,
 </span></span><span style="display:flex;"><span>		      GPIO_I2C1_SCL <span style="color:#f92672">|</span> GPIO_I2C1_SDA);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* Disable the I2C before changing any configuration. */</span>
-</span></span><span style="display:flex;"><span>	i2c_peripheral_disable(I2C1);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_peripheral_disable</span>(I2C1);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* APB1 is running at 36MHz. */</span>
-</span></span><span style="display:flex;"><span>	i2c_set_clock_frequency(I2C1, <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_set_clock_frequency</span>(I2C1, <span style="color:#ae81ff">8</span>);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* this may not be needed */</span>
-</span></span><span style="display:flex;"><span>    i2c_set_speed(I2C1, i2c_speed_sm_100k, <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">i2c_set_speed</span>(I2C1, i2c_speed_sm_100k, <span style="color:#ae81ff">8</span>);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* 100KHz */</span>
-</span></span><span style="display:flex;"><span>	i2c_set_standard_mode(I2C1);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_set_standard_mode</span>(I2C1);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* If everything is configured -&gt; enable the peripheral. */</span>
-</span></span><span style="display:flex;"><span>	i2c_peripheral_enable(I2C1);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_peripheral_enable</span>(I2C1);
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/**
@@ -491,19 +491,19 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">usart_setup</span>(<span style="color:#66d9ef">void</span>)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Setup GPIO pin GPIO_USART1_RE_TX on GPIO port B for transmit. */</span>
-</span></span><span style="display:flex;"><span>    gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_set_mode</span>(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
 </span></span><span style="display:flex;"><span>              GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART1_TX);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Setup UART parameters. */</span>
-</span></span><span style="display:flex;"><span>    usart_set_baudrate(USART1, <span style="color:#ae81ff">9600</span>);
-</span></span><span style="display:flex;"><span>    usart_set_databits(USART1, <span style="color:#ae81ff">8</span>); 
-</span></span><span style="display:flex;"><span>    usart_set_stopbits(USART1, USART_STOPBITS_1);
-</span></span><span style="display:flex;"><span>    usart_set_parity(USART1, USART_PARITY_NONE);
-</span></span><span style="display:flex;"><span>    usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
-</span></span><span style="display:flex;"><span>    usart_set_mode(USART1, USART_MODE_TX);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_baudrate</span>(USART1, <span style="color:#ae81ff">9600</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_databits</span>(USART1, <span style="color:#ae81ff">8</span>); 
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_stopbits</span>(USART1, USART_STOPBITS_1);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_parity</span>(USART1, USART_PARITY_NONE);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_flow_control</span>(USART1, USART_FLOWCONTROL_NONE);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_mode</span>(USART1, USART_MODE_TX);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Finally enable the USART. */</span>
-</span></span><span style="display:flex;"><span>    usart_enable(USART1);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_enable</span>(USART1);
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
@@ -512,16 +512,16 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* this timer setup is taken 1:1 from the 
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">       timer example of this repository */</span>
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    nvic_enable_irq(NVIC_TIM2_IRQ);
-</span></span><span style="display:flex;"><span>    rcc_periph_reset_pulse(RST_TIM2);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">nvic_enable_irq</span>(NVIC_TIM2_IRQ);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">rcc_periph_reset_pulse</span>(RST_TIM2);
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT,
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_mode</span>(TIM2, TIM_CR1_CKD_CK_INT,
 </span></span><span style="display:flex;"><span>        TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    timer_set_prescaler(TIM2, (<span style="color:#ae81ff">8000</span><span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_prescaler</span>(TIM2, (<span style="color:#ae81ff">8000</span><span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>));
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	timer_disable_preload(TIM2);
-</span></span><span style="display:flex;"><span>	timer_continuous_mode(TIM2);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">timer_disable_preload</span>(TIM2);
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">timer_continuous_mode</span>(TIM2);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* with the input frequency being 1000kHz, we can use this
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">       value to control the timer interrupts in seconds. 
@@ -532,10 +532,10 @@ send_data(uint8_t *buf)
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">        20  = 0.02  sec == 50 Hz
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
 </span></span><span style="display:flex;"><span>    
-</span></span><span style="display:flex;"><span>    timer_set_period(TIM2, <span style="color:#ae81ff">250</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_period</span>(TIM2, <span style="color:#ae81ff">250</span>);
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    timer_enable_counter(TIM2);
-</span></span><span style="display:flex;"><span>    timer_enable_irq(TIM2, TIM_DIER_CC1IE);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_enable_counter</span>(TIM2);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_enable_irq</span>(TIM2, TIM_DIER_CC1IE);
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e">/**
@@ -546,7 +546,7 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
 </span></span><span style="display:flex;"><span><span style="color:#a6e22e">gpio_setup</span>(<span style="color:#66d9ef">void</span>)
 </span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    gpio_set_mode(GPIOC,
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_set_mode</span>(GPIOC,
 </span></span><span style="display:flex;"><span>        GPIO_MODE_OUTPUT_2_MHZ,
 </span></span><span style="display:flex;"><span>        GPIO_CNF_OUTPUT_PUSHPULL,
 </span></span><span style="display:flex;"><span>        GPIO13
@@ -571,7 +571,7 @@ send_data(uint8_t *buf)
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> temp_reg <span style="color:#f92672">=</span> PRB_TEMPERATURE;
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    i2c_transfer7(I2C1, TMP102_DEVICE_ADDR, <span style="color:#f92672">&amp;</span>temp_reg, <span style="color:#ae81ff">1</span>, 
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">i2c_transfer7</span>(I2C1, TMP102_DEVICE_ADDR, <span style="color:#f92672">&amp;</span>temp_reg, <span style="color:#ae81ff">1</span>, 
 </span></span><span style="display:flex;"><span>        <span style="color:#f92672">&amp;</span>p_buf[<span style="color:#ae81ff">0</span>], TEMPERATURE_READ_BYTES);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>}
@@ -590,13 +590,13 @@ send_data(uint8_t *buf)
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">        care about the reading to keep things simple so we
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">        only send the raw MSB and LSB.
 </span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">0</span>]);	
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">1</span>]);	
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">2</span>]);	
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">3</span>]);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">0</span>]);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">1</span>]);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">2</span>]);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">3</span>]);	
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, <span style="color:#e6db74">&#39;\r&#39;</span>);	
-</span></span><span style="display:flex;"><span>    usart_send_blocking(USART1, <span style="color:#e6db74">&#39;\n&#39;</span>);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, <span style="color:#e6db74">&#39;\r&#39;</span>);	
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, <span style="color:#e6db74">&#39;\n&#39;</span>);	
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> 
@@ -609,31 +609,31 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(timer_get_flag(TIM2, TIM_SR_CC1IF))
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#a6e22e">timer_get_flag</span>(TIM2, TIM_SR_CC1IF))
 </span></span><span style="display:flex;"><span>    {
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* clear the interrupt */</span>
-</span></span><span style="display:flex;"><span>        timer_clear_flag(TIM2, TIM_SR_CC1IF);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">timer_clear_flag</span>(TIM2, TIM_SR_CC1IF);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* read from the sensor */</span>
-</span></span><span style="display:flex;"><span>        read_sensor(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">read_sensor</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>        
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* filter data */</span>
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to fixed point */</span>
 </span></span><span style="display:flex;"><span>        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* add to buffer */</span>
-</span></span><span style="display:flex;"><span>        circ_buf_put(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* convolution */</span>
-</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> circ_buf_convolution(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> <span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to raw bytes */</span>
 </span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
 </span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* send what we read via UART */</span>
-</span></span><span style="display:flex;"><span>        send_data(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">send_data</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
-</span></span><span style="display:flex;"><span>        gpio_toggle(GPIOC, GPIO13);
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">gpio_toggle</span>(GPIOC, GPIO13);
 </span></span><span style="display:flex;"><span>    } <span style="color:#75715e">/* if */</span>
 </span></span><span style="display:flex;"><span>}
 </span></span><span style="display:flex;"><span>
@@ -642,20 +642,20 @@ send_data(uint8_t *buf)
 </span></span><span style="display:flex;"><span>{
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    circ_buf_init((circ_buf_t<span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_cbuf);
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">circ_buf_init</span>((<span style="color:#66d9ef">circ_buf_t</span><span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_cbuf);
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* initialize the filter coefficients */</span>
 </span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
 </span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        g_fcoeff[i] <span style="color:#f92672">=</span> FLOAT2FIXED16(<span style="color:#ae81ff">1.0</span> <span style="color:#f92672">/</span> (<span style="color:#66d9ef">float</span>)CIRC_BUFFER_SIZE);
+</span></span><span style="display:flex;"><span>        g_fcoeff[i] <span style="color:#f92672">=</span> <span style="color:#a6e22e">FLOAT2FIXED16</span>(<span style="color:#ae81ff">1.0</span> <span style="color:#f92672">/</span> (<span style="color:#66d9ef">float</span>)CIRC_BUFFER_SIZE);
 </span></span><span style="display:flex;"><span>    }
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	clock_setup();
-</span></span><span style="display:flex;"><span>	i2c_setup();
-</span></span><span style="display:flex;"><span>    usart_setup();
-</span></span><span style="display:flex;"><span>    gpio_setup();
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">clock_setup</span>();
+</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_setup</span>();
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_setup</span>();
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_setup</span>();
 </span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    timer_setup();
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_setup</span>();
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span> (<span style="color:#ae81ff">1</span>) {}
 </span></span><span style="display:flex;"><span>
