@@ -6,17 +6,7 @@
     <description>Recent content in Posts on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 17 Oct 2023 19:11:03 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Notes on PEB Walking</title>
-      <link>https://0xca7.github.io/posts/pebwalk_notes/</link>
-      <pubDate>Tue, 17 Oct 2023 19:11:03 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/pebwalk_notes/</guid>
-      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader
-As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
-    </item>
-    
+    <lastBuildDate>Fri, 06 Jan 2023 18:17:14 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Reversing AARCH64 C&#43;&#43; Binaries</title>
       <link>https://0xca7.github.io/posts/aarch64_cpp/</link>
@@ -39,7 +29,7 @@ As I found the report to be excellent, I aimed to replicate the findings to lear
       <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).
 Time to do my part and review the course. I like small reviews, so I will keep it at that.
 Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.
-Key Points very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction Details The course starts with a general introduction to malware and the analysis of malware.</description>
+Key Points  very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction  Details The course starts with a general introduction to malware and the analysis of malware.</description>
     </item>
     
     <item>

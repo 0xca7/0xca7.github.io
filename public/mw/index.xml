@@ -6,7 +6,17 @@
     <description>Recent content in Mws on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 03 Sep 2022 09:52:46 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/mw/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 17 Oct 2023 19:11:03 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/mw/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Notes on PEB Walking</title>
+      <link>https://0xca7.github.io/mw/pebwalk_notes/</link>
+      <pubDate>Tue, 17 Oct 2023 19:11:03 +0200</pubDate>
+      
+      <guid>https://0xca7.github.io/mw/pebwalk_notes/</guid>
+      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader
+As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
+    </item>
+    
     <item>
       <title>Stop/DJVU Analysis</title>
       <link>https://0xca7.github.io/mw/stop_djvu/</link>

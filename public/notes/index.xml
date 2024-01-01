@@ -16,7 +16,7 @@
       <description>check if LE or BE
 file cramfs if the file is big endian, make it little endian with this
 cramfsswap cramfs cramfs_le extract
-# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;#34;cramfs_le&amp;#34; sudo fsck.cramfs --extract=fs cramfs_le </description>
+# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;quot;cramfs_le&amp;quot; sudo fsck.cramfs --extract=fs cramfs_le </description>
     </item>
     
     <item>
@@ -45,8 +45,8 @@ mount -t ubifs /dev/ubi0_X /mnt/ubifs </description>
 https://www.youtube.com/watch?v=ALn0hUxNszI&amp;amp;t=1288s
 Credit to the Author.
 I just took what he&amp;rsquo;s doing and made it work on my machine, instead of MIPS I&amp;rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.
-Create a Dockerfile MIPS from the talk in [Resources]:
-FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;#34;/usr/bin/qemu-mips-static&amp;#34;, &amp;#34;bin/busybox&amp;#34;] ENV ARCH=mips ARM from my setup:</description>
+ Create a Dockerfile MIPS from the talk in [Resources]:
+FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;quot;/usr/bin/qemu-mips-static&amp;quot;, &amp;quot;bin/busybox&amp;quot;] ENV ARCH=mips ARM from my setup:</description>
     </item>
     
     <item>
@@ -56,7 +56,8 @@ FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./fi
       
       <guid>https://0xca7.github.io/notes/pq_lattice/</guid>
       <description>These are my notes for lattice crypto, please mind the mentioned authors that enabled me to take these notes. All credit goes to those people, not me.
-see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;</description>
+see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;
+ </description>
     </item>
     
     <item>
@@ -107,7 +108,7 @@ Create a container debian_test based on the debian image with full host network 
       
       <guid>https://0xca7.github.io/notes/calling_conventions/</guid>
       <description>This is a small overview of calling conventions regarding the x86 and x86_64 architectures, both for Windows and Linux
-Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function. Return values are stored in the EAX register.</description>
+ Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function.</description>
     </item>
     
   </channel>

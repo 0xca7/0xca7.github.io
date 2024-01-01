@@ -9,10 +9,10 @@
     <lastBuildDate>Tue, 17 Oct 2023 19:11:03 +0200</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Notes on PEB Walking</title>
-      <link>https://0xca7.github.io/posts/pebwalk_notes/</link>
+      <link>https://0xca7.github.io/mw/pebwalk_notes/</link>
       <pubDate>Tue, 17 Oct 2023 19:11:03 +0200</pubDate>
       
-      <guid>https://0xca7.github.io/posts/pebwalk_notes/</guid>
+      <guid>https://0xca7.github.io/mw/pebwalk_notes/</guid>
       <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader
 As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
     </item>
@@ -36,7 +36,7 @@ Introduction For the last couple of years, I&amp;rsquo;ve been doing some securi
       <description>check if LE or BE
 file cramfs if the file is big endian, make it little endian with this
 cramfsswap cramfs cramfs_le extract
-# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;#34;cramfs_le&amp;#34; sudo fsck.cramfs --extract=fs cramfs_le </description>
+# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;quot;cramfs_le&amp;quot; sudo fsck.cramfs --extract=fs cramfs_le </description>
     </item>
     
     <item>
@@ -78,8 +78,8 @@ mount -t ubifs /dev/ubi0_X /mnt/ubifs </description>
 https://www.youtube.com/watch?v=ALn0hUxNszI&amp;amp;t=1288s
 Credit to the Author.
 I just took what he&amp;rsquo;s doing and made it work on my machine, instead of MIPS I&amp;rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.
-Create a Dockerfile MIPS from the talk in [Resources]:
-FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;#34;/usr/bin/qemu-mips-static&amp;#34;, &amp;#34;bin/busybox&amp;#34;] ENV ARCH=mips ARM from my setup:</description>
+ Create a Dockerfile MIPS from the talk in [Resources]:
+FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;quot;/usr/bin/qemu-mips-static&amp;quot;, &amp;quot;bin/busybox&amp;quot;] ENV ARCH=mips ARM from my setup:</description>
     </item>
     
     <item>
@@ -89,7 +89,8 @@ FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./fi
       
       <guid>https://0xca7.github.io/notes/pq_lattice/</guid>
       <description>These are my notes for lattice crypto, please mind the mentioned authors that enabled me to take these notes. All credit goes to those people, not me.
-see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;</description>
+see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;
+ </description>
     </item>
     
     <item>
@@ -101,7 +102,7 @@ see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;</descriptio
       <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).
 Time to do my part and review the course. I like small reviews, so I will keep it at that.
 Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.
-Key Points very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction Details The course starts with a general introduction to malware and the analysis of malware.</description>
+Key Points  very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction  Details The course starts with a general introduction to malware and the analysis of malware.</description>
     </item>
     
     <item>
@@ -208,7 +209,7 @@ My Script I created a simple Ghidra Python3 script that uses unicorn together wi
       
       <guid>https://0xca7.github.io/notes/calling_conventions/</guid>
       <description>This is a small overview of calling conventions regarding the x86 and x86_64 architectures, both for Windows and Linux
-Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function. Return values are stored in the EAX register.</description>
+ Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function.</description>
     </item>
     
     <item>
