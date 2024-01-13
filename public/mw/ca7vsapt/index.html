@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Battling with APT malware | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Battling with APT malware</span></h1>
+
+<h2 class="date">2024/01/01</h2>
+</div>
+
+<main>
+<p>When I read malware analysis reports, I try to replicate them. That means I skim
+the report, if the malware is interesting, I get a sample and dig into it. When I
+get stuck, I go back to the report for help. I came across an interesting analysis  of an APT malware: <a href="https://asec.ahnlab.com/en/57684/">https://asec.ahnlab.com/en/57684/</a>.</p>
+<p>As a target I decided to look at the dropper component:</p>
+<pre tabindex="0"><code>MD5: 1ecd83ee7e4cfc8fed7ceb998e75b996
+SHA256: eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5
+</code></pre><p>The report covers a lot of ground and explains the workings of the malware perfectly.
+During my reversing work, I produced two results/details that may add to the findings.</p>
+<h3 id="string-encryption">String &ldquo;Encryption&rdquo;</h3>
+<p>The obfuscation of the strings in the malware is not a simple, standard XOR. Instead, it is a more complicated operation as shown in the following listing:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">char</span> <span style="color:#66d9ef">__cdecl</span> <span style="color:#a6e22e">sub_402C80</span>(<span style="color:#66d9ef">int</span> <span style="color:#f92672">*</span>a_key, <span style="color:#66d9ef">int</span> a_data, <span style="color:#66d9ef">int</span> a_size)
+{
+  <span style="color:#66d9ef">char</span> result; <span style="color:#75715e">// al
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v4; <span style="color:#75715e">// ecx
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v5; <span style="color:#75715e">// edx
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v6; <span style="color:#75715e">// ecx
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> byte; <span style="color:#75715e">// edx
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v8; <span style="color:#75715e">// cl
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v9; <span style="color:#75715e">// al
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> i; <span style="color:#75715e">// ecx
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v11; <span style="color:#75715e">// bl
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v12; <span style="color:#75715e">// [esp+7h] [ebp-11h]
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v13; <span style="color:#75715e">// [esp+8h] [ebp-10h]
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v14; <span style="color:#75715e">// [esp+Ch] [ebp-Ch]
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v15; <span style="color:#75715e">// [esp+10h] [ebp-8h]
+</span><span style="color:#75715e"></span>  <span style="color:#66d9ef">int</span> v16; <span style="color:#75715e">// [esp+14h] [ebp-4h]
+</span><span style="color:#75715e"></span>
+  result <span style="color:#f92672">=</span> (<span style="color:#66d9ef">char</span>)a_key;
+  <span style="color:#66d9ef">if</span> ( a_key <span style="color:#f92672">&amp;&amp;</span> a_data <span style="color:#f92672">&amp;&amp;</span> a_size <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">1</span> )
+  {
+    v4 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>a_key;
+    v14 <span style="color:#f92672">=</span> a_key[<span style="color:#ae81ff">1</span>];
+    v5 <span style="color:#f92672">=</span> a_key[<span style="color:#ae81ff">3</span>];
+    v13 <span style="color:#f92672">=</span> v4;
+    v6 <span style="color:#f92672">=</span> a_key[<span style="color:#ae81ff">2</span>];
+    v16 <span style="color:#f92672">=</span> v5;
+    byte <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+    v15 <span style="color:#f92672">=</span> v6;
+    result <span style="color:#f92672">=</span> HIBYTE(v16);
+    v8 <span style="color:#f92672">=</span> v13;
+    <span style="color:#66d9ef">do</span>
+    {
+      v9 <span style="color:#f92672">=</span> v8 <span style="color:#f92672">^</span> BYTE2(v13) <span style="color:#f92672">^</span> (BYTE2(v14) <span style="color:#f92672">+</span> result);
+      <span style="color:#66d9ef">for</span> ( i <span style="color:#f92672">=</span> <span style="color:#ae81ff">15</span>; i <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>; <span style="color:#f92672">--</span>i )
+        <span style="color:#f92672">*</span>((_BYTE <span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>v13 <span style="color:#f92672">+</span> i) <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(<span style="color:#f92672">&amp;</span>v12 <span style="color:#f92672">+</span> i);
+      v11 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(byte <span style="color:#f92672">+</span> a_data);
+      v8 <span style="color:#f92672">=</span> v9;
+      result <span style="color:#f92672">=</span> HIBYTE(v16);
+      LOBYTE(v13) <span style="color:#f92672">=</span> v8;
+      <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(byte <span style="color:#f92672">+</span> a_data) <span style="color:#f92672">=</span> HIBYTE(v16) <span style="color:#f92672">^</span> v11;
+      <span style="color:#f92672">++</span>byte;
+    }
+    <span style="color:#66d9ef">while</span> ( byte <span style="color:#f92672">&lt;</span> a_size );
+  }
+  <span style="color:#66d9ef">return</span> result;
+}
+</code></pre></div><p>They key point here is that the decryption routine does not contain any parts
+which cannot be emulated by a CPU emulator. The arguments to the function are
+passed via the stack, consisting of the key, the encrypted data and the data size.</p>
+<p>Using Unicorn and a small python script, this is easily emulated, as shown below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">import</span> struct
+<span style="color:#f92672">import</span> pefile
+<span style="color:#f92672">from</span> unicorn <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+<span style="color:#f92672">from</span> unicorn.x86_const <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+
+<span style="color:#f92672">from</span> capstone <span style="color:#f92672">import</span> <span style="color:#f92672">*</span>
+
+STACK_SIZE <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1000</span>
+STACK_ADDR <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x8000</span>
+
+SCRATCH_ADDR <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x4000</span>
+SCRATCH_SIZE <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1000</span>
+
+<span style="color:#66d9ef">class</span> <span style="color:#a6e22e">EmuSection</span>:
+
+    <span style="color:#66d9ef">def</span> __init__(self, name, addr_base, addr, size, data):
+        self<span style="color:#f92672">.</span>name <span style="color:#f92672">=</span> name<span style="color:#f92672">.</span>decode(<span style="color:#e6db74">&#34;utf-8&#34;</span>)
+        self<span style="color:#f92672">.</span>addr_base <span style="color:#f92672">=</span> addr_base
+        self<span style="color:#f92672">.</span>addr <span style="color:#f92672">=</span> addr
+        self<span style="color:#f92672">.</span>size <span style="color:#f92672">=</span> size
+        self<span style="color:#f92672">.</span>data <span style="color:#f92672">=</span> data
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">load_data</span>():
+
+    sections <span style="color:#f92672">=</span> []
+    pe <span style="color:#f92672">=</span> pefile<span style="color:#f92672">.</span>PE(<span style="color:#e6db74">&#39;../eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5&#39;</span>)
+    <span style="color:#66d9ef">for</span> section <span style="color:#f92672">in</span> pe<span style="color:#f92672">.</span>sections:
+        sections<span style="color:#f92672">.</span>append(EmuSection(section<span style="color:#f92672">.</span>Name, 
+            int(pe<span style="color:#f92672">.</span>OPTIONAL_HEADER<span style="color:#f92672">.</span>ImageBase), int(section<span style="color:#f92672">.</span>VirtualAddress),
+            section<span style="color:#f92672">.</span>section_max_addr <span style="color:#f92672">-</span> section<span style="color:#f92672">.</span>section_min_addr, section<span style="color:#f92672">.</span>get_data()))
+
+    <span style="color:#66d9ef">return</span> sections
+
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">code_hook</span>(uc, addr, size, usr_data):
+    code <span style="color:#f92672">=</span> uc<span style="color:#f92672">.</span>mem_read(addr, size)
+    md <span style="color:#f92672">=</span> Cs(CS_ARCH_X86, CS_MODE_32)
+    esi <span style="color:#f92672">=</span> uc<span style="color:#f92672">.</span>reg_read(UC_X86_REG_ESI)
+    edi <span style="color:#f92672">=</span> uc<span style="color:#f92672">.</span>reg_read(UC_X86_REG_EDI)
+    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> md<span style="color:#f92672">.</span>disasm(code, addr):
+        <span style="color:#75715e"># print(&#34;0x%x:\t%s\t%s&#34; %(i.address, i.mnemonic, i.op_str))</span>
+        <span style="color:#66d9ef">if</span> i<span style="color:#f92672">.</span>mnemonic <span style="color:#f92672">==</span> <span style="color:#e6db74">&#34;ret&#34;</span>:
+            print(<span style="color:#e6db74">&#34;[+] caught RET, stopping.&#34;</span>)
+            uc<span style="color:#f92672">.</span>emu_stop()
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+
+    arg0 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x0040e110</span>)    <span style="color:#75715e"># the key</span>
+    arg1 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x00411040</span>)    <span style="color:#75715e"># the data</span>
+    arg2 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x33a</span>)         <span style="color:#75715e"># datasize</span>
+    emulate(
+        arg0, arg1, arg2, <span style="color:#ae81ff">0x411040</span>, <span style="color:#ae81ff">0x33a</span>
+    )
+
+    arg0 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x40e120</span>)  
+    arg1 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x4114c0</span>)  
+    arg2 <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;i&#39;</span>, <span style="color:#ae81ff">0x829</span>)    
+    emulate(
+        arg0, arg1, arg2, <span style="color:#ae81ff">0x4114c0</span>, <span style="color:#ae81ff">0x829</span>
+    )
+
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">emulate</span>(arg0, arg1, arg2, result, size):
+
+    sections <span style="color:#f92672">=</span> load_data()
+    code <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+
+    code_start <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x2c80</span> <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x1000</span>
+    code_end   <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x2d05</span> <span style="color:#f92672">-</span> <span style="color:#ae81ff">0x1000</span> <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+
+    mu <span style="color:#f92672">=</span> Uc(UC_ARCH_X86, UC_MODE_32)
+
+    <span style="color:#75715e"># have this around just in case</span>
+    print(<span style="color:#e6db74">&#34;[+] init scratchmem&#34;</span>)
+    mu<span style="color:#f92672">.</span>mem_map(SCRATCH_ADDR, SCRATCH_SIZE, UC_PROT_ALL)
+    mu<span style="color:#f92672">.</span>mem_write(SCRATCH_ADDR<span style="color:#f92672">+</span><span style="color:#ae81ff">0x1ae</span>, g_CONFIG)
+
+    <span style="color:#66d9ef">for</span> section <span style="color:#f92672">in</span> sections:
+        print(<span style="color:#e6db74">&#34;[</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">]&gt; </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(section<span style="color:#f92672">.</span>name, 
+            hex(section<span style="color:#f92672">.</span>addr <span style="color:#f92672">+</span> section<span style="color:#f92672">.</span>addr_base)))
+        
+        <span style="color:#75715e"># align to pagesize for memory mapping</span>
+        aligned_size <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+        <span style="color:#66d9ef">if</span> section<span style="color:#f92672">.</span>size <span style="color:#f92672">%</span> <span style="color:#ae81ff">0x1000</span> <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+            aligned_size <span style="color:#f92672">=</span> section<span style="color:#f92672">.</span>size
+        <span style="color:#66d9ef">else</span>:
+            aligned_size <span style="color:#f92672">=</span> (section<span style="color:#f92672">.</span>size <span style="color:#f92672">//</span> <span style="color:#ae81ff">0x1000</span> <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">*</span> <span style="color:#ae81ff">0x1000</span>
+
+        print(<span style="color:#e6db74">&#34;[+] mapping </span><span style="color:#e6db74">{:x}</span><span style="color:#e6db74"> - </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> bytes (0x</span><span style="color:#e6db74">{:x}</span><span style="color:#e6db74">)&#34;</span><span style="color:#f92672">.</span>format(section<span style="color:#f92672">.</span>addr<span style="color:#f92672">+</span>section<span style="color:#f92672">.</span>addr_base,
+            section<span style="color:#f92672">.</span>size, aligned_size))
+
+        mu<span style="color:#f92672">.</span>mem_map(section<span style="color:#f92672">.</span>addr <span style="color:#f92672">+</span> section<span style="color:#f92672">.</span>addr_base, aligned_size, UC_PROT_ALL)
+        mu<span style="color:#f92672">.</span>mem_write(section<span style="color:#f92672">.</span>addr <span style="color:#f92672">+</span> section<span style="color:#f92672">.</span>addr_base, section<span style="color:#f92672">.</span>data)
+
+    print(<span style="color:#e6db74">&#34;[+] performing stack setup&#34;</span>)
+    <span style="color:#75715e"># setup stack</span>
+    mu<span style="color:#f92672">.</span>mem_map(STACK_ADDR, STACK_SIZE, UC_PROT_ALL)
+
+    stack_start <span style="color:#f92672">=</span> STACK_ADDR <span style="color:#f92672">+</span> STACK_SIZE <span style="color:#f92672">//</span> <span style="color:#ae81ff">2</span>
+    mu<span style="color:#f92672">.</span>mem_write(stack_start, arg2)
+    mu<span style="color:#f92672">.</span>mem_write(stack_start<span style="color:#f92672">-</span><span style="color:#ae81ff">4</span>, arg1)
+    mu<span style="color:#f92672">.</span>mem_write(stack_start<span style="color:#f92672">-</span><span style="color:#ae81ff">8</span>, arg0)
+    stack_start <span style="color:#f92672">-=</span> <span style="color:#ae81ff">12</span>
+
+
+    mu<span style="color:#f92672">.</span>reg_write(UC_X86_REG_ESP, stack_start)
+    mu<span style="color:#f92672">.</span>reg_write(UC_X86_REG_EBP, stack_start)
+
+    <span style="color:#66d9ef">if</span> <span style="color:#e6db74">&#34;.text&#34;</span> <span style="color:#f92672">in</span> section<span style="color:#f92672">.</span>name:
+        code <span style="color:#f92672">=</span> section<span style="color:#f92672">.</span>data[code_start:code_end]
+        <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> code:
+            print(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{:02x}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(byte), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39; &#39;</span>)
+        print()
+
+    mu<span style="color:#f92672">.</span>hook_add(UC_HOOK_CODE, code_hook)
+
+    addr <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x402c80</span>
+    code_size <span style="color:#f92672">=</span> code_end <span style="color:#f92672">-</span> code_start
+
+    print(<span style="color:#e6db74">&#34;[+] running emulation (a0: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> a1: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> a2: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">)&#34;</span><span style="color:#f92672">.</span>format(arg0, arg1, arg2))
+    mu<span style="color:#f92672">.</span>emu_start(addr, addr<span style="color:#f92672">+</span>code_size)
+
+    data <span style="color:#f92672">=</span> mu<span style="color:#f92672">.</span>mem_read(result, size)
+
+    print(<span style="color:#e6db74">&#34;raw data: </span><span style="color:#e6db74">{}</span><span style="color:#ae81ff">\n\n\n</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(data))
+
+    <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> data:
+        <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>:
+            print()
+        <span style="color:#66d9ef">else</span>:
+            print(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)), end<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;&#39;</span>)
+
+
+<span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;__main__&#39;</span>:
+    main()
+</code></pre></div><p>The script above is not the cleanest, I just hacked it as fast as possible. However, it gets the job done.
+Here&rsquo;s a part of the output, the strings are successfully decrypted:</p>
+<pre tabindex="0"><code>\Registry\Machine\SYSTEM\CurrentControlSet\Control\WMI\Security
+125463f3-2a9c-bdf0-d890-5a98b08d8898
+f0012345-2a9c-bdf8-345d-345d67b542a1
+cgi_config
+Application 
+Background 
+Control 
+Desktop 
+Extension 
+Function 
+Group 
+Host 
+Intelligent 
+Key 
+Layer 
+Multimedia 
+Network 
+Operation 
+Portable
+--- SNIP ---
+</code></pre><p>The calls to the decryption function are consistent, meaning the above script can be used to decrypt any parts of the dropper by just supplying the address of key, data and the data size.</p>
+<p>Once the strings were decrypted, I patched them into the binary, overwriting the encrypted part. As a result, the output in Binary Ninja looks pretty nice and readable:</p>
+<pre tabindex="0"><code>--- SNIP ---
+00402d6d          data_412d68 = data_412bc4(hModule, &quot;FreeLibrary&quot;);
+00402d7e          data_412bbc = data_412bc4(hModule, &quot;CreateThread&quot;);
+00402d8f          data_412c28 = data_412bc4(hModule, &quot;GetExitCodeProcess&quot;);
+00402da0          data_412d44 = data_412bc4(hModule, &quot;TerminateProcess&quot;);
+--- SNIP ---
+</code></pre><p>There&rsquo;s really no need to automatically rename the global variables, for example <code>data_412d68</code> to <code>FreeLibrary</code>. Every time I encounter a function call via a global, I just look at the cross references tab and see the function name, which I then rename manually.</p>
+<h3 id="config-extraction">Config Extraction</h3>
+<p>As far as the configuration is concerned, the details are covered in the report. In short summary, the configuration is stored as a zip in the resource section, also containing the next stage. There is password protection for the zip, with the password stored as an ASCII string in the dropper binary. Extracting the config is a simple process:</p>
+<ol>
+<li>extract the zip from the resource section (.rsrc) by using the zip magic</li>
+<li>get all strings from the binary, one of them is the password</li>
+<li>try to unzip with all of the strings, one string must successfully unzip the data</li>
+<li>the smaller of the two files is the config, read and parse it (structure given in the report)</li>
+<li>output the config</li>
+</ol>
+<p>Again, I hacked up a simple python script that does the work:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">import</span> os
+<span style="color:#f92672">import</span> sys
+<span style="color:#f92672">import</span> pefile
+<span style="color:#f92672">from</span> os <span style="color:#f92672">import</span> walk
+<span style="color:#f92672">from</span> zipfile <span style="color:#f92672">import</span> ZipFile
+
+FILEPATH<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;../eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5&#39;</span>
+
+<span style="color:#e6db74">&#34;&#34;&#34;
+</span><span style="color:#e6db74">extract the resource section
+</span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">extract_rsrc</span>():
+    pe <span style="color:#f92672">=</span> pefile<span style="color:#f92672">.</span>PE(FILEPATH)
+    <span style="color:#66d9ef">for</span> section <span style="color:#f92672">in</span> pe<span style="color:#f92672">.</span>sections:
+        <span style="color:#66d9ef">if</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;rsrc&#34;</span> <span style="color:#f92672">in</span> section<span style="color:#f92672">.</span>Name:
+            <span style="color:#66d9ef">return</span> section<span style="color:#f92672">.</span>get_data()
+
+<span style="color:#e6db74">&#34;&#34;&#34;
+</span><span style="color:#e6db74">collect strings in the binary
+</span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">get_strings</span>():
+    
+    strings <span style="color:#f92672">=</span> []
+    temp <span style="color:#f92672">=</span> []
+    <span style="color:#66d9ef">with</span> open(FILEPATH, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> f:
+        data <span style="color:#f92672">=</span> f<span style="color:#f92672">.</span>read()
+        <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> data:
+            <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7e</span>:
+                temp<span style="color:#f92672">.</span>append(byte)
+            <span style="color:#66d9ef">else</span>:
+                <span style="color:#66d9ef">if</span> len(temp) <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">5</span>:
+                    s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#39;&#39;</span><span style="color:#f92672">.</span>join(chr(e) <span style="color:#66d9ef">for</span> e <span style="color:#f92672">in</span> temp)
+                    strings<span style="color:#f92672">.</span>append(s)
+                temp <span style="color:#f92672">=</span> []
+    <span style="color:#66d9ef">return</span> strings
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+
+    <span style="color:#75715e"># get the resource section and strings</span>
+    rsrc <span style="color:#f92672">=</span> extract_rsrc()
+    strings <span style="color:#f92672">=</span> get_strings()
+
+    <span style="color:#75715e"># find the zipfile in the resource section</span>
+    ZIPMAGIC <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x50\x4b\x03\x04</span><span style="color:#e6db74">&#34;</span>
+    idx <span style="color:#f92672">=</span> rsrc<span style="color:#f92672">.</span>find(ZIPMAGIC)
+    rsrc <span style="color:#f92672">=</span> rsrc[idx:]
+
+    <span style="color:#75715e"># create the output directory</span>
+    os<span style="color:#f92672">.</span>mkdir(<span style="color:#e6db74">&#34;out&#34;</span>)
+
+    <span style="color:#75715e"># write the zipfile to disk</span>
+    <span style="color:#66d9ef">with</span> open(<span style="color:#e6db74">&#34;out/extracted_zip.zip&#34;</span>, <span style="color:#e6db74">&#34;wb&#34;</span>) <span style="color:#66d9ef">as</span> f:
+        f<span style="color:#f92672">.</span>write(rsrc)
+
+    <span style="color:#75715e"># now try all of the strings until we find the one that is the ZIP password</span>
+    <span style="color:#66d9ef">with</span> ZipFile(<span style="color:#e6db74">&#34;out/extracted_zip.zip&#34;</span>) <span style="color:#66d9ef">as</span> zf:
+        <span style="color:#66d9ef">for</span> string <span style="color:#f92672">in</span> strings:
+            <span style="color:#66d9ef">try</span>:
+                zf<span style="color:#f92672">.</span>extractall(path<span style="color:#f92672">=</span><span style="color:#e6db74">&#34;out/&#34;</span>, pwd<span style="color:#f92672">=</span>bytes(string, <span style="color:#e6db74">&#34;utf-8&#34;</span>))
+                print(<span style="color:#e6db74">&#34;extracted with pwd: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(string))
+                <span style="color:#66d9ef">break</span>
+            <span style="color:#66d9ef">except</span>:
+                <span style="color:#66d9ef">pass</span>
+
+    <span style="color:#75715e"># collect the files we extracted</span>
+    files <span style="color:#f92672">=</span> []
+    <span style="color:#66d9ef">for</span> (dirpath, dirnames, filenames) <span style="color:#f92672">in</span> walk(<span style="color:#e6db74">&#34;out/&#34;</span>):
+        files<span style="color:#f92672">.</span>extend(filenames)
+        <span style="color:#66d9ef">break</span> <span style="color:#75715e"># need only toplevel</span>
+
+    <span style="color:#75715e"># now find the smallest of the files, which contains the config</span>
+    MIN_SIZE <span style="color:#f92672">=</span> sys<span style="color:#f92672">.</span>maxsize
+    MIN_FILE <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span>
+    <span style="color:#66d9ef">for</span> file <span style="color:#f92672">in</span> files:
+        <span style="color:#66d9ef">with</span> open(<span style="color:#e6db74">&#34;out/&#34;</span> <span style="color:#f92672">+</span> file, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> f:
+            size <span style="color:#f92672">=</span> len(f<span style="color:#f92672">.</span>read())
+            <span style="color:#66d9ef">if</span> MIN_SIZE <span style="color:#f92672">&gt;</span> size:
+                MIN_SIZE <span style="color:#f92672">=</span> size
+                MIN_FILE <span style="color:#f92672">=</span> file
+
+    print(<span style="color:#e6db74">&#34;smallest file stores the config: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(MIN_FILE))
+
+    <span style="color:#75715e"># decode the config. IP addresses start at offset 0x12</span>
+    <span style="color:#75715e"># read 8 bytes at a time, 4 bytes for the IP 4 bytes for the port</span>
+    <span style="color:#75715e"># </span>
+    <span style="color:#75715e"># (sidenote: a port is at most 0xffff, why store 4 bytes!?</span>
+    <span style="color:#75715e">#            2 bytes are wasted)</span>
+    <span style="color:#75715e">#</span>
+    <span style="color:#75715e"># print all of the IPs and ports (defanged)</span>
+    <span style="color:#66d9ef">with</span> open(<span style="color:#e6db74">&#34;out/&#34;</span> <span style="color:#f92672">+</span> MIN_FILE, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> f:
+        data <span style="color:#f92672">=</span> f<span style="color:#f92672">.</span>read()
+        data <span style="color:#f92672">=</span> data[<span style="color:#ae81ff">0x12</span>:] <span style="color:#75715e"># this is where the IPs and ports start</span>
+
+        <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, len(data)<span style="color:#f92672">-</span><span style="color:#ae81ff">8</span>, <span style="color:#ae81ff">8</span>):
+
+            <span style="color:#66d9ef">if</span> data[i:i<span style="color:#f92672">+</span><span style="color:#ae81ff">8</span>] <span style="color:#f92672">==</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#39;</span><span style="color:#ae81ff">\x00\x00\x00\x00\x00\x00\x00\x00</span><span style="color:#e6db74">&#39;</span>:
+                <span style="color:#66d9ef">break</span>
+            ip <span style="color:#f92672">=</span> data[i:i<span style="color:#f92672">+</span><span style="color:#ae81ff">4</span>]
+            port <span style="color:#f92672">=</span> data[i<span style="color:#f92672">+</span><span style="color:#ae81ff">4</span>:i<span style="color:#f92672">+</span><span style="color:#ae81ff">8</span>]
+
+            print(<span style="color:#e6db74">&#34;IP: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">[.]</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">.</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">.</span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> Port: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(
+                ip[<span style="color:#ae81ff">0</span>], ip[<span style="color:#ae81ff">1</span>], ip[<span style="color:#ae81ff">2</span>], ip[<span style="color:#ae81ff">3</span>], int(port[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">8</span> <span style="color:#f92672">|</span> port[<span style="color:#ae81ff">1</span>])))
+
+
+<span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;__main__&#39;</span>:
+    main()
+</code></pre></div><p>The output is as follows:</p>
+<pre tabindex="0"><code>extracted with pwd: !1234567890 dghtdhtrhgfjnui$%^^&amp;fdt
+smallest file stores the config: Config.cpl
+IP: 103[.]16.223.35 Port: 36895
+IP: 113[.]28.244.194 Port: 36895
+IP: 116[.]48.145.179 Port: 36895
+IP: 186[.]116.9.20 Port: 16415
+IP: 186[.]149.198.172 Port: 36895
+IP: 186[.]67.71.97 Port: 36895
+IP: 195[.]28.91.232 Port: 38943
+IP: 195[.]97.97.148 Port: 36895
+IP: 199[.]15.234.120 Port: 36895
+IP: 200[.]42.69.133 Port: 36895
+IP: 203[.]131.222.99 Port: 36895
+IP: 210[.]187.87.181 Port: 36895
+IP: 83[.]231.204.157 Port: 38943
+IP: 84[.]232.224.218 Port: 38943
+IP: 89[.]190.188.42 Port: 36895
+</code></pre><h3 id="conclusion">Conclusion</h3>
+<p>Automation with a little python magic gets a whole lot done. Decrypting the strings
+and using the cross references tab in binja makes the malware readable and the config is easily extracted using pefile and ZipFile.</p>
+<p>Thanks to ahnlab for the amazing report :)</p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

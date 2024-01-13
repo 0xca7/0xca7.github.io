@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Notes on PEB Walking | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Notes on PEB Walking</span></h1>
+
+<h2 class="date">2023/10/17</h2>
+</div>
+
+<main>
+<p>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from <code>ntdll</code>. I followed this report: <a href="https://www.elastic.co/security-labs/blister-loader">https://www.elastic.co/security-labs/blister-loader</a></p>
+<p>As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing. At some point, the report states that the malware &ldquo;enumerates and hashes each export of ntdll&hellip;&rdquo; - That means walking the PEB (Process Environment Block) and API hashing. I wanted to understand this in detail, it&rsquo;s been a while since I reversed this technique, so I started to dig in. Here are my notes and a comprehension of links I used to figure this out. Maybe they&rsquo;re helpful to someone else. Also, I wanted to share the awesome links I found explaining PEB walk etc. be sure to check the references! :)</p>
+<hr>
+<p>Sample SHA256: <code>afb77617a4ca637614c429440c78da438e190dd1ca24dc78483aa731d80832c2</code> ()</p>
+<p>Below, you can see the start of the PEB walk. I added numbers you can follow.</p>
+<pre tabindex="0"><code>1  17173852  64a130000000       mov     eax, dword [fs:0x30]
+   17173858  53                 push    ebx {__saved_ebx}  {0x0}
+   17173859  57                 push    edi {__saved_edi}
+   1717385a  8975f4             mov     dword [ebp-0xc {var_10_1}], esi  {0x0}
+2  1717385d  8b400c             mov     eax, dword [eax+0xc]
+3  17173860  8b401c             mov     eax, dword [eax+0x1c]
+   17173863  c745e8004ab6f3     mov     dword [ebp-0x18 {v_xorkey}], 0xf3b64a00  
+4  1717386a  8b5808             mov     ebx, dword [eax+0x8]  // *flink
+   1717386d  8b433c             mov     eax, dword [ebx+0x3c]  // e_lfanew
+   17173870  8b441878           mov     eax, dword [eax+ebx+0x78]
+</code></pre><ol>
+<li>this fetches a pointer to the PEB, which is stored in <code>eax</code></li>
+<li><code>PEB + 0x0c</code> is the offset inside the PEB pointing to <code>PPEB_LDR_DATA LoaderData</code> [1]</li>
+<li><code>PEB + 0x1c</code> is the offset inside <code>PEB_LDR_DATA</code> [2] to the variable <code>InInitilizationOrder</code>, the list of modules in initialization order</li>
+<li>The list is doubly linked [3] what we have in <code>eax</code> is <code>*Flink</code> - now comes the part that got me confused: where does <code>eax+0x8</code> point to? If you look at the <code>LDR_MODULE</code> structure [4], you will see that the base address of NTDLL, which we want to fetch, is not at offset <code>0x8</code>, but at the offset <code>0x18</code> instead:</li>
+</ol>
+<p>Each <code>LIST_ENTRY</code> is 8 bytes, thus, the base address SHOULD be at offset <code>0x18</code>, why use the offset <code>0x08</code> then? The blog post [2] helps out here - without it, that would&rsquo;ve been a long debug session. We&rsquo;re actually <code>0x10</code> bytes into the <code>LDR_MODULE</code> struct with the <code>InInitalizationOrderModuleList</code>, thus, relatively speaking, the offset the to the base address is at <code>0x08</code>! I added the absolute and relative offsets to the struct below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">typedef</span> <span style="color:#66d9ef">struct</span> _LDR_MODULE {
+<span style="color:#75715e">/* offset */</span>
+<span style="color:#f92672">-</span><span style="color:#ae81ff">16</span>   <span style="color:#ae81ff">00</span>  LIST_ENTRY              _InLoadOrderModuleList_;
+<span style="color:#f92672">-</span><span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">08</span>  LIST_ENTRY              _InMemoryOrderModuleList_;
+ <span style="color:#ae81ff">00</span>   <span style="color:#ae81ff">10</span>  LIST_ENTRY              _InInitializationOrderModuleList_;
+ <span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">18</span>  PVOID                   _BaseAddress_;
+		  PVOID                   _EntryPoint_;
+		  ULONG                   _SizeOfImage_;
+		  UNICODE_STRING          _FullDllName_;
+		  UNICODE_STRING          _BaseDllName_;
+		  ULONG                   _Flags_;
+		  SHORT                   _LoadCount_;
+		  SHORT                   _TlsIndex_;
+		  LIST_ENTRY              _HashTableEntry_;
+		  ULONG                   _TimeDateStamp_;
+} LDR_MODULE, <span style="color:#f92672">*</span>PLDR_MODULE;
+</code></pre></div><p>Now it all makes sense. Shoutout to the author, dzzie for [2]. The PEB walk is available as C/ASM code and documented here: [5] - check it out if you want to compile a minimal version with source code to reverse and learn from.</p>
+<hr>
+<p>References:</p>
+<p>[1] <a href="http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/PEB.html">http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/PEB.html</a></p>
+<p>[2] <a href="http://sandsprite.com/CodeStuff/Understanding_the_Peb_Loader_Data_List.html">http://sandsprite.com/CodeStuff/Understanding_the_Peb_Loader_Data_List.html</a></p>
+<p>[3] <a href="https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-list_entry">https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-list_entry</a></p>
+<p>[4] <a href="http://undocumented.ntinternals.net/UserMode/Structures/LDR_MODULE.html">http://undocumented.ntinternals.net/UserMode/Structures/LDR_MODULE.html</a></p>
+<p>[5] <a href="https://github.com/jstrosch/learning-malware-analysis/blob/master/Dynamic%20Analysis/dynamic_analysis.c">https://github.com/jstrosch/learning-malware-analysis/blob/master/Dynamic%20Analysis/dynamic_analysis.c</a></p>
+<p>0xca7</p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

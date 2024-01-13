@@ -58,26 +58,26 @@
 <p>A floating point number is pretty much a number where the decimal point can move about as needed. The standard IEEE754 documents floats and shows how they work. Typically, without having a FPU, the calculations underlying floating points are expensive. Thus, in application where no floating point numbers are available, for instance in microcontrollers without an FPU or in a FGPA, fixed-point numbers come into play.</p>
 <p>A fixed-point number is a scaled integer value with a decimal point that does not move, hence the <em>fixed</em>. As an example, I&rsquo;ll use an 8-Bit signed integer. To denote where the decimal point is, you can use the <em>Q-Format</em>. Thus, Q3.4 means the decimal point is in the &ldquo;middle&rdquo;, the MSB is used to store the sign value.</p>
 <p>That means if you have Q3.4, you need $m + n + 1$ bits to represent it. There are 3 bits for the decimal part and 4 bits for the fractional part:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-console" data-lang="console"><span style="display:flex;"><span>Q3.4
-</span></span><span style="display:flex;"><span>    sign |   2^2 2^1 2^0   |  2^-1 2^-2 2^-3 2^-4
-</span></span><span style="display:flex;"><span>bit 7    |   6   5   4     |  3    2    1    0
-</span></span><span style="display:flex;"><span>    0    |   0   0   0     |  0    0    0    0 
-</span></span></code></pre></div><p>For fixed-point numbers with a sign bit, we have the range $−2^m to +2^m − 2^{−n }$, in the case of the Q3.4 that is:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-console" data-lang="console">Q3.4
+    sign |   2^2 2^1 2^0   |  2^-1 2^-2 2^-3 2^-4
+bit 7    |   6   5   4     |  3    2    1    0
+    0    |   0   0   0     |  0    0    0    0 
+</code></pre></div><p>For fixed-point numbers with a sign bit, we have the range $−2^m to +2^m − 2^{−n }$, in the case of the Q3.4 that is:</p>
 <p>$$
 [-2^3 ; +2^3 - 2^{-4}] = [ -8 ; 7.9375 ]
 $$</p>
 <p>Note that we&rsquo;re still working with integer values under the hood, we just &ldquo;imagine&rdquo; the decimal point and scale the integer.</p>
 <p>Let&rsquo;s expand this to 16-bit signed integers and work with those <code>Q11.4 = 11 + 4 + 1 = 16 bits</code></p>
 <p>To define this in code, let&rsquo;s first set our fractional bits:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">#define FRAC_BITS_16 4
-</span></span></span></code></pre></div><p>&hellip; and define a type to distinguish fixed points from integers:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#75715e">#define FRAC_BITS_16 4
+</span></code></pre></div><p>&hellip; and define a type to distinguish fixed points from integers:</p>
 <pre tabindex="0"><code>typedef int16_t fp16;
 </code></pre><h2 id="float-to-fixed-and-vice-versa">Float to Fixed and Vice Versa</h2>
 <p>To convert from float to fixed, we use:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">#define FLOAT2FIXED16(n) ( (fp16)(n * (1 &lt;&lt; FRAC_BITS_16)) )
-</span></span></span></code></pre></div><p>To convert from fixed to float, we use:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">#define FIXED2FLOAT16(n) ( ((float)n / (1 &lt;&lt; FRAC_BITS_16)) )
-</span></span></span></code></pre></div><p>Note that both operations are just scaling, nothing more.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#75715e">#define FLOAT2FIXED16(n) ( (fp16)(n * (1 &lt;&lt; FRAC_BITS_16)) )
+</span></code></pre></div><p>To convert from fixed to float, we use:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#75715e">#define FIXED2FLOAT16(n) ( ((float)n / (1 &lt;&lt; FRAC_BITS_16)) )
+</span></code></pre></div><p>Note that both operations are just scaling, nothing more.</p>
 <h2 id="basic-arithmetic">Basic Arithmetic</h2>
 <p>For the arithmetic functions, I will define inline functions.</p>
 <p>Addition and Subtraction don&rsquo;t need any special operations.</p>
@@ -93,38 +93,38 @@ fp16_sub(int16_t a, int16_t b)
     return a - b;
 }
 </code></pre><p>Multiplication on the other hand requires a scaling operation to take place:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">inline</span> fp16
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">fp16_mul</span>(<span style="color:#66d9ef">int16_t</span> a, <span style="color:#66d9ef">int16_t</span> b)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (fp16)((((<span style="color:#66d9ef">int32_t</span>)a) <span style="color:#f92672">*</span> ((<span style="color:#66d9ef">int32_t</span>)b)) <span style="color:#f92672">&gt;&gt;</span> FRAC_BITS_16);
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>The important thing about this operation is that the integers we multiply are cast to double their width. So, for 16-bit integers, we need to cast to 32-bit integers. The multiplication is done on 32-bit integers, the result is again scaled and cast back to a fixed point (just a int16_t).</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">inline</span> fp16
+<span style="color:#a6e22e">fp16_mul</span>(<span style="color:#66d9ef">int16_t</span> a, <span style="color:#66d9ef">int16_t</span> b)
+{
+    <span style="color:#66d9ef">return</span> (fp16)((((<span style="color:#66d9ef">int32_t</span>)a) <span style="color:#f92672">*</span> ((<span style="color:#66d9ef">int32_t</span>)b)) <span style="color:#f92672">&gt;&gt;</span> FRAC_BITS_16);
+}
+</code></pre></div><p>The important thing about this operation is that the integers we multiply are cast to double their width. So, for 16-bit integers, we need to cast to 32-bit integers. The multiplication is done on 32-bit integers, the result is again scaled and cast back to a fixed point (just a int16_t).</p>
 <p>An example:</p>
 <p>Take two Q3.4 numbers and multiply them.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-console" data-lang="console"><span style="display:flex;"><span>q0 = 2.5
-</span></span><span style="display:flex;"><span>q1 = 2.0
-</span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">
-</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span># | separates off the sign bit
-</span></span><span style="display:flex;"><span># . shows where the decimal point <span style="color:#e6db74">&#34;would be&#34;</span>
-</span></span><span style="display:flex;"><span>q0 = 0|010.1000 = 00101000 = 40
-</span></span><span style="display:flex;"><span>q1 = 0|010.0000 = 00010000 = 32
-</span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">
-</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span># without the decimal point, we calculate 40*48
-</span></span><span style="display:flex;"><span>q2 = q0 * q1 = 40 * 32 = 1280 = 0x500 = 0101|0000|0000
-</span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010">
-</span></span></span><span style="display:flex;"><span><span style="color:#960050;background-color:#1e0010"></span># we are above <span style="color:#ae81ff">16</span> bits at this point, that<span style="color:#960050;background-color:#1e0010">&#39;</span>s why we cast <span style="color:#66d9ef">for</span> the multiplication
-</span></span><span style="display:flex;"><span># the result is also wrong at the moment, we need to scale back in order to get the correct result
-</span></span><span style="display:flex;"><span>0101|0000|0000 &gt;&gt; 4 = 0101|0000 = 5
-</span></span></code></pre></div><p>For Division we get:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * divide two numbers
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">inline</span> fp16
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">fp16_div</span>(<span style="color:#66d9ef">int16_t</span> a, <span style="color:#66d9ef">int16_t</span> b)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (fp16)( ( ((<span style="color:#66d9ef">int32_t</span>)a) <span style="color:#f92672">&lt;&lt;</span> FRAC_BITS_16 ) <span style="color:#f92672">/</span> b);
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>The dividend is scaled by the fractional bits, then divided by the divisor. In the end, we have to cast again.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-console" data-lang="console">q0 = 2.5
+q1 = 2.0
+<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span># | separates off the sign bit
+# . shows where the decimal point <span style="color:#e6db74">&#34;would be&#34;</span>
+q0 = 0|010.1000 = 00101000 = 40
+q1 = 0|010.0000 = 00010000 = 32
+<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span># without the decimal point, we calculate 40*48
+q2 = q0 * q1 = 40 * 32 = 1280 = 0x500 = 0101|0000|0000
+<span style="color:#960050;background-color:#1e0010">
+</span><span style="color:#960050;background-color:#1e0010"></span># we are above <span style="color:#ae81ff">16</span> bits at this point, that<span style="color:#960050;background-color:#1e0010">&#39;</span>s why we cast <span style="color:#66d9ef">for</span> the multiplication
+# the result is also wrong at the moment, we need to scale back in order to get the correct result
+0101|0000|0000 &gt;&gt; 4 = 0101|0000 = 5
+</code></pre></div><p>For Division we get:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#75715e">/**
+</span><span style="color:#75715e"> * divide two numbers
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">inline</span> fp16
+<span style="color:#a6e22e">fp16_div</span>(<span style="color:#66d9ef">int16_t</span> a, <span style="color:#66d9ef">int16_t</span> b)
+{
+    <span style="color:#66d9ef">return</span> (fp16)( ( ((<span style="color:#66d9ef">int32_t</span>)a) <span style="color:#f92672">&lt;&lt;</span> FRAC_BITS_16 ) <span style="color:#f92672">/</span> b);
+}
+</code></pre></div><p>The dividend is scaled by the fractional bits, then divided by the divisor. In the end, we have to cast again.</p>
 <p>Example:</p>
 <p>With Q3.4 numbers again</p>
 <pre tabindex="0"><code>q0 = 0010|0000 = 32
@@ -262,8 +262,8 @@ byte 0    | byte 1
 0000 0000 . 0000
 sddd dddd . ffff
 </code></pre><p>With a little bit of bitshifting, we can convert this to Q11.4:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span>fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
-</span></span></code></pre></div><p>This cuts off the irrelevant parts of the LSB and puts the MSB part into the correct position.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C">fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
+</code></pre></div><p>This cuts off the irrelevant parts of the LSB and puts the MSB part into the correct position.</p>
 <p>Here is how you read the sensor:</p>
 <pre tabindex="0"><code>static void 
 read_sensor(uint8_t *p_buf)
@@ -276,51 +276,51 @@ read_sensor(uint8_t *p_buf)
 }
 </code></pre><p>The <code>i2c_transfer7</code> function takes the device address, the register we ant to read (+ the datasize) and a buffer to store the result (+ buffer size). That&rsquo;s it. Note that this function generates a repeated start condition, which we need to read the TMP102. Thus, with a setup function for I2C and one line of code, we can read the TMP102 temperature register, neat.</p>
 <p>&hellip; and this is the full code for the ISR:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">tim2_isr</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* buffer to store the raw sensor values and filtered values 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       buffer[0], buffer[1] = raw sensor values
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       buffer[2], buffer[3] = fp16 with 4 fracbits split into MSB | LSB
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">     */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#a6e22e">timer_get_flag</span>(TIM2, TIM_SR_CC1IF))
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* clear the interrupt */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">timer_clear_flag</span>(TIM2, TIM_SR_CC1IF);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* read from the sensor */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">read_sensor</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* filter data */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to fixed point */</span>
-</span></span><span style="display:flex;"><span>        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* add to buffer */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* convolution */</span>
-</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> <span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to raw bytes */</span>
-</span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
-</span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* send what we read via UART */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">send_data</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">gpio_toggle</span>(GPIOC, GPIO13);
-</span></span><span style="display:flex;"><span>    } <span style="color:#75715e">/* if */</span>
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p>Now for the last two parts.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">tim2_isr</span>(<span style="color:#66d9ef">void</span>)
+{
+    <span style="color:#75715e">/* buffer to store the raw sensor values and filtered values 
+</span><span style="color:#75715e">       buffer[0], buffer[1] = raw sensor values
+</span><span style="color:#75715e">       buffer[2], buffer[3] = fp16 with 4 fracbits split into MSB | LSB
+</span><span style="color:#75715e">     */</span>
+
+    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+
+    <span style="color:#66d9ef">if</span>(timer_get_flag(TIM2, TIM_SR_CC1IF))
+    {
+        <span style="color:#75715e">/* clear the interrupt */</span>
+        timer_clear_flag(TIM2, TIM_SR_CC1IF);
+
+        <span style="color:#75715e">/* read from the sensor */</span>
+        read_sensor(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+
+        <span style="color:#75715e">/* filter data */</span>
+
+        <span style="color:#75715e">/* to fixed point */</span>
+        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
+        <span style="color:#75715e">/* add to buffer */</span>
+        circ_buf_put(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
+        <span style="color:#75715e">/* convolution */</span>
+        fp16 filt <span style="color:#f92672">=</span> circ_buf_convolution(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
+        <span style="color:#75715e">/* to raw bytes */</span>
+        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
+        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
+
+        <span style="color:#75715e">/* send what we read via UART */</span>
+        send_data(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+
+        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
+        gpio_toggle(GPIOC, GPIO13);
+    } <span style="color:#75715e">/* if */</span>
+}
+</code></pre></div><p>Now for the last two parts.</p>
 <ol>
 <li>Filtering the Data</li>
 </ol>
 <p>All of the data is placed into a circular buffer with a width of <code>i</code> fp16 numbers. That means the buffer stores the last <code>i</code> samples from the sensor at all times.</p>
 <p>Via convolution with an array, also consisting of <code>i</code> fp16 values, the filtered result is obtained. For a moving average filter this is just an array of <code>i</code> times <code>1/i</code>. This is pre-calculated.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-console" data-lang="console"><span style="display:flex;"><span>array[i] = { 1/i, 1/i ... 1/i }
-</span></span></code></pre></div><ol start="2">
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-console" data-lang="console">array[i] = { 1/i, 1/i ... 1/i }
+</code></pre></div><ol start="2">
 <li>Send the data out via the UART (<code>send_data</code>)</li>
 </ol>
 <pre tabindex="0"><code>static void
@@ -331,337 +331,337 @@ send_data(uint8_t *buf)
     usart_send_blocking(USART1, buf[2]);
     usart_send_blocking(USART1, buf[3]);
 
-    usart_send_blocking(USART1, &#39;\r&#39;);
-    usart_send_blocking(USART1, &#39;\n&#39;);
+    usart_send_blocking(USART1, '\r');
+    usart_send_blocking(USART1, '\n');
 }
 </code></pre><p>Here, bytes 0 and 1 contain the raw value and bytes 2 and 3 contain the filtered value.</p>
 <hr>
 <h2 id="full-code">Full Code</h2>
 <p>Here is everything, I just packed the fixed point stuff into a separate header file.</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-C" data-lang="C"><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief example of using I2C with the STM32F103C6T6A and
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *        a TMP102 by TI
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @description
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *  this project reads the temperature from a TMP102 sensor.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *  if you see @man in here, consult the datasheet of the TMP102
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @author 0xca7
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/cm3/nvic.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/rcc.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/gpio.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/i2c.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/usart.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/timer.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;fixed16.h&gt;</span><span style="color:#75715e">
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief the device address of the TMP102 sensor */</span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#define TMP102_DEVICE_ADDR      0x48
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief pointer register byte */</span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#define PRB_TEMPERATURE         0x00
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define PRB_CONFIGURATION       0x01
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define PRB_TLOW                0x02
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#define PRB_THIGH               0x03
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief the number of bytes we need for temperature measurement */</span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#define TEMPERATURE_READ_BYTES  0x02
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief a circular buffer used for filtering */</span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">#define CIRC_BUFFER_SIZE    4
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">typedef</span> <span style="color:#66d9ef">struct</span> 
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint16_t</span> q[CIRC_BUFFER_SIZE];
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint8_t</span> head;
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">circ_buf_t</span>;
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief filter coefficients */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> fp16 g_fcoeff[CIRC_BUFFER_SIZE] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief circ buffer used for filtering */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">circ_buf_t</span> g_cbuf <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/** @brief initialize the buffer to a reset state */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_init</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        p_buf<span style="color:#f92672">-&gt;</span>q[i] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>    p_buf<span style="color:#f92672">-&gt;</span>head <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>fp16
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf, fp16 <span style="color:#f92672">*</span>h)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> cursor <span style="color:#f92672">=</span> p_buf<span style="color:#f92672">-&gt;</span>head;
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    fp16 res <span style="color:#f92672">=</span> <span style="color:#a6e22e">FLOAT2FIXED16</span>(<span style="color:#ae81ff">0.0</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        cursor<span style="color:#f92672">--</span>;
-</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span>(cursor <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span>)
-</span></span><span style="display:flex;"><span>        {
-</span></span><span style="display:flex;"><span>            cursor <span style="color:#f92672">=</span> CIRC_BUFFER_SIZE<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
-</span></span><span style="display:flex;"><span>        }
-</span></span><span style="display:flex;"><span>        res <span style="color:#f92672">=</span> <span style="color:#a6e22e">fp16_add</span>(res, 
-</span></span><span style="display:flex;"><span>            <span style="color:#a6e22e">fp16_mul</span>(p_buf<span style="color:#f92672">-&gt;</span>q[cursor], <span style="color:#f92672">*</span>(h<span style="color:#f92672">+</span>i)));
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> res;
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#66d9ef">circ_buf_t</span> <span style="color:#f92672">*</span>p_buf, <span style="color:#66d9ef">uint16_t</span> val)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    p_buf<span style="color:#f92672">-&gt;</span>q[p_buf<span style="color:#f92672">-&gt;</span>head] <span style="color:#f92672">=</span> val;
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* less expensive than modulo */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#f92672">++</span>(p_buf<span style="color:#f92672">-&gt;</span>head) <span style="color:#f92672">==</span> CIRC_BUFFER_SIZE)
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        p_buf<span style="color:#f92672">-&gt;</span>head <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief   performs clock setup for all needed peripherals
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @note    this MUST be the first function called before all 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> *          all other setup functions
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param   void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return  void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">clock_setup</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOA);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOB);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_GPIOC);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_AFIO);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_I2C1);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_USART1);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">rcc_periph_clock_enable</span>(RCC_TIM2);
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief   sets up I2C with 100kHz in standard mode
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @note    requires GPIOB and I2C1 clocks to be enabled
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param   void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return  void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> <span style="color:#a6e22e">i2c_setup</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* Set alternate functions for the SCL and SDA pins of I2C1. */</span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">gpio_set_mode</span>(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
-</span></span><span style="display:flex;"><span>		      GPIO_CNF_OUTPUT_ALTFN_OPENDRAIN,
-</span></span><span style="display:flex;"><span>		      GPIO_I2C1_SCL <span style="color:#f92672">|</span> GPIO_I2C1_SDA);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* Disable the I2C before changing any configuration. */</span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_peripheral_disable</span>(I2C1);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* APB1 is running at 36MHz. */</span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_set_clock_frequency</span>(I2C1, <span style="color:#ae81ff">8</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* this may not be needed */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">i2c_set_speed</span>(I2C1, i2c_speed_sm_100k, <span style="color:#ae81ff">8</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* 100KHz */</span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_set_standard_mode</span>(I2C1);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#75715e">/* If everything is configured -&gt; enable the peripheral. */</span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_peripheral_enable</span>(I2C1);
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief   sets up the USART with 8N1 - TX only with 9600 Baud
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @note    requires GPIOA and USART1 clocks to be enabled
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param   void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return  void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">usart_setup</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Setup GPIO pin GPIO_USART1_RE_TX on GPIO port B for transmit. */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_set_mode</span>(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
-</span></span><span style="display:flex;"><span>              GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART1_TX);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Setup UART parameters. */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_baudrate</span>(USART1, <span style="color:#ae81ff">9600</span>);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_databits</span>(USART1, <span style="color:#ae81ff">8</span>); 
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_stopbits</span>(USART1, USART_STOPBITS_1);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_parity</span>(USART1, USART_PARITY_NONE);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_flow_control</span>(USART1, USART_FLOWCONTROL_NONE);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_set_mode</span>(USART1, USART_MODE_TX);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* Finally enable the USART. */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_enable</span>(USART1);
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">timer_setup</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* this timer setup is taken 1:1 from the 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       timer example of this repository */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">nvic_enable_irq</span>(NVIC_TIM2_IRQ);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">rcc_periph_reset_pulse</span>(RST_TIM2);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_mode</span>(TIM2, TIM_CR1_CKD_CK_INT,
-</span></span><span style="display:flex;"><span>        TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_prescaler</span>(TIM2, (<span style="color:#ae81ff">8000</span><span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>));
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">timer_disable_preload</span>(TIM2);
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">timer_continuous_mode</span>(TIM2);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* with the input frequency being 1000kHz, we can use this
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       value to control the timer interrupts in seconds. 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       1000 = 1     sec 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        500 = 0.5   sec
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        250 = 0.25  sec
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        125 = 0.125 sec
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        20  = 0.02  sec == 50 Hz
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
-</span></span><span style="display:flex;"><span>    
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_set_period</span>(TIM2, <span style="color:#ae81ff">250</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_enable_counter</span>(TIM2);
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_enable_irq</span>(TIM2, TIM_DIER_CC1IE);
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief configure the onboard LED as an output
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">gpio_setup</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_set_mode</span>(GPIOC,
-</span></span><span style="display:flex;"><span>        GPIO_MODE_OUTPUT_2_MHZ,
-</span></span><span style="display:flex;"><span>        GPIO_CNF_OUTPUT_PUSHPULL,
-</span></span><span style="display:flex;"><span>        GPIO13
-</span></span><span style="display:flex;"><span>    );
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief this function reads from the sensor 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @warning the buffer needs to be 3 bytes in size
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param p_buf the buffer to read to
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">read_sensor</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>p_buf)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/*
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        1. we have to write the value of the register we want
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">           to access into the pointer register. For this example,
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">           we write 0x00, which I called PRB_TEMPERATURE because
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">           we want to read the temperature register @man.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        2. after that, we send start and read two bytes.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> temp_reg <span style="color:#f92672">=</span> PRB_TEMPERATURE;
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">i2c_transfer7</span>(I2C1, TMP102_DEVICE_ADDR, <span style="color:#f92672">&amp;</span>temp_reg, <span style="color:#ae81ff">1</span>, 
-</span></span><span style="display:flex;"><span>        <span style="color:#f92672">&amp;</span>p_buf[<span style="color:#ae81ff">0</span>], TEMPERATURE_READ_BYTES);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#75715e">/**
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief this function sends the sensor data via the UART 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param p_buf the buffer to send
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return void
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">send_data</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>buf)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/*
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        the temperature reading returns three bytes,
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        the MSB, LSB and a PEC (CRC-8 checksum), we only
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        care about the reading to keep things simple so we
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">        only send the raw MSB and LSB.
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">    */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">0</span>]);	
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">1</span>]);	
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">2</span>]);	
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, buf[<span style="color:#ae81ff">3</span>]);	
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, <span style="color:#e6db74">&#39;\r&#39;</span>);	
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_send_blocking</span>(USART1, <span style="color:#e6db74">&#39;\n&#39;</span>);	
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> 
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">tim2_isr</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* buffer to store the raw sensor values and filtered values 
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       buffer[0], buffer[1] = raw sensor values
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">       buffer[2], buffer[3] = fp16 with 4 fracbits split into MSB | LSB
-</span></span></span><span style="display:flex;"><span><span style="color:#75715e">     */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span>(<span style="color:#a6e22e">timer_get_flag</span>(TIM2, TIM_SR_CC1IF))
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* clear the interrupt */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">timer_clear_flag</span>(TIM2, TIM_SR_CC1IF);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* read from the sensor */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">read_sensor</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>        
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* filter data */</span>
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to fixed point */</span>
-</span></span><span style="display:flex;"><span>        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* add to buffer */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">circ_buf_put</span>(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* convolution */</span>
-</span></span><span style="display:flex;"><span>        fp16 filt <span style="color:#f92672">=</span> <span style="color:#a6e22e">circ_buf_convolution</span>(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* to raw bytes */</span>
-</span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
-</span></span><span style="display:flex;"><span>        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* send what we read via UART */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">send_data</span>(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
-</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">gpio_toggle</span>(GPIOC, GPIO13);
-</span></span><span style="display:flex;"><span>    } <span style="color:#75715e">/* if */</span>
-</span></span><span style="display:flex;"><span>}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> 
-</span></span><span style="display:flex;"><span><span style="color:#a6e22e">main</span>(<span style="color:#66d9ef">void</span>)
-</span></span><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">circ_buf_init</span>((<span style="color:#66d9ef">circ_buf_t</span><span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_cbuf);
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#75715e">/* initialize the filter coefficients */</span>
-</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
-</span></span><span style="display:flex;"><span>    {
-</span></span><span style="display:flex;"><span>        g_fcoeff[i] <span style="color:#f92672">=</span> <span style="color:#a6e22e">FLOAT2FIXED16</span>(<span style="color:#ae81ff">1.0</span> <span style="color:#f92672">/</span> (<span style="color:#66d9ef">float</span>)CIRC_BUFFER_SIZE);
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">clock_setup</span>();
-</span></span><span style="display:flex;"><span>	<span style="color:#a6e22e">i2c_setup</span>();
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">usart_setup</span>();
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">gpio_setup</span>();
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">timer_setup</span>();
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span> (<span style="color:#ae81ff">1</span>) {}
-</span></span><span style="display:flex;"><span>
-</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><h1 id="result">Result</h1>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-C" data-lang="C"><span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief example of using I2C with the STM32F103C6T6A and
+</span><span style="color:#75715e"> *        a TMP102 by TI
+</span><span style="color:#75715e"> *
+</span><span style="color:#75715e"> * @description
+</span><span style="color:#75715e"> *  this project reads the temperature from a TMP102 sensor.
+</span><span style="color:#75715e"> *  if you see @man in here, consult the datasheet of the TMP102
+</span><span style="color:#75715e"> *
+</span><span style="color:#75715e"> * @author 0xca7
+</span><span style="color:#75715e"> */</span>
+
+<span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/cm3/nvic.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/rcc.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/gpio.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/i2c.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/usart.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;libopencm3/stm32/timer.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;fixed16.h&gt;</span><span style="color:#75715e">
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">/** @brief the device address of the TMP102 sensor */</span>
+<span style="color:#75715e">#define TMP102_DEVICE_ADDR      0x48
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">/** @brief pointer register byte */</span>
+<span style="color:#75715e">#define PRB_TEMPERATURE         0x00
+</span><span style="color:#75715e">#define PRB_CONFIGURATION       0x01
+</span><span style="color:#75715e">#define PRB_TLOW                0x02
+</span><span style="color:#75715e">#define PRB_THIGH               0x03
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">/** @brief the number of bytes we need for temperature measurement */</span>
+<span style="color:#75715e">#define TEMPERATURE_READ_BYTES  0x02
+</span><span style="color:#75715e"></span>
+<span style="color:#75715e">/** @brief a circular buffer used for filtering */</span>
+<span style="color:#75715e">#define CIRC_BUFFER_SIZE    4
+</span><span style="color:#75715e"></span><span style="color:#66d9ef">typedef</span> <span style="color:#66d9ef">struct</span> 
+{
+    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint16_t</span> q[CIRC_BUFFER_SIZE];
+    <span style="color:#66d9ef">volatile</span> <span style="color:#66d9ef">uint8_t</span> head;
+}
+circ_buf_t;
+
+<span style="color:#75715e">/** @brief filter coefficients */</span>
+<span style="color:#66d9ef">static</span> fp16 g_fcoeff[CIRC_BUFFER_SIZE] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+
+<span style="color:#75715e">/** @brief circ buffer used for filtering */</span>
+<span style="color:#66d9ef">static</span> circ_buf_t g_cbuf <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+
+<span style="color:#75715e">/** @brief initialize the buffer to a reset state */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">circ_buf_init</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf)
+{
+    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
+    {
+        p_buf<span style="color:#f92672">-&gt;</span>q[i] <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+    }
+    p_buf<span style="color:#f92672">-&gt;</span>head <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+}
+
+fp16
+<span style="color:#a6e22e">circ_buf_convolution</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf, fp16 <span style="color:#f92672">*</span>h)
+{
+    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+    <span style="color:#66d9ef">int</span> cursor <span style="color:#f92672">=</span> p_buf<span style="color:#f92672">-&gt;</span>head;
+
+    fp16 res <span style="color:#f92672">=</span> FLOAT2FIXED16(<span style="color:#ae81ff">0.0</span>);
+
+    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
+    {
+        cursor<span style="color:#f92672">--</span>;
+        <span style="color:#66d9ef">if</span>(cursor <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0</span>)
+        {
+            cursor <span style="color:#f92672">=</span> CIRC_BUFFER_SIZE<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>;
+        }
+        res <span style="color:#f92672">=</span> fp16_add(res, 
+            fp16_mul(p_buf<span style="color:#f92672">-&gt;</span>q[cursor], <span style="color:#f92672">*</span>(h<span style="color:#f92672">+</span>i)));
+    }
+
+    <span style="color:#66d9ef">return</span> res;
+}
+
+<span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">circ_buf_put</span>(circ_buf_t <span style="color:#f92672">*</span>p_buf, <span style="color:#66d9ef">uint16_t</span> val)
+{
+    p_buf<span style="color:#f92672">-&gt;</span>q[p_buf<span style="color:#f92672">-&gt;</span>head] <span style="color:#f92672">=</span> val;
+
+    <span style="color:#75715e">/* less expensive than modulo */</span>
+    <span style="color:#66d9ef">if</span>(<span style="color:#f92672">++</span>(p_buf<span style="color:#f92672">-&gt;</span>head) <span style="color:#f92672">==</span> CIRC_BUFFER_SIZE)
+    {
+        p_buf<span style="color:#f92672">-&gt;</span>head <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+    }
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief   performs clock setup for all needed peripherals
+</span><span style="color:#75715e"> * @note    this MUST be the first function called before all 
+</span><span style="color:#75715e"> *          all other setup functions
+</span><span style="color:#75715e"> * @param   void
+</span><span style="color:#75715e"> * @return  void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
+<span style="color:#a6e22e">clock_setup</span>(<span style="color:#66d9ef">void</span>)
+{
+	rcc_periph_clock_enable(RCC_GPIOA);
+	rcc_periph_clock_enable(RCC_GPIOB);
+	rcc_periph_clock_enable(RCC_GPIOC);
+	rcc_periph_clock_enable(RCC_AFIO);
+	rcc_periph_clock_enable(RCC_I2C1);
+	rcc_periph_clock_enable(RCC_USART1);
+	rcc_periph_clock_enable(RCC_TIM2);
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief   sets up I2C with 100kHz in standard mode
+</span><span style="color:#75715e"> * @note    requires GPIOB and I2C1 clocks to be enabled
+</span><span style="color:#75715e"> * @param   void
+</span><span style="color:#75715e"> * @return  void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> <span style="color:#a6e22e">i2c_setup</span>(<span style="color:#66d9ef">void</span>)
+{
+
+	<span style="color:#75715e">/* Set alternate functions for the SCL and SDA pins of I2C1. */</span>
+	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
+		      GPIO_CNF_OUTPUT_ALTFN_OPENDRAIN,
+		      GPIO_I2C1_SCL <span style="color:#f92672">|</span> GPIO_I2C1_SDA);
+
+	<span style="color:#75715e">/* Disable the I2C before changing any configuration. */</span>
+	i2c_peripheral_disable(I2C1);
+
+	<span style="color:#75715e">/* APB1 is running at 36MHz. */</span>
+	i2c_set_clock_frequency(I2C1, <span style="color:#ae81ff">8</span>);
+
+    <span style="color:#75715e">/* this may not be needed */</span>
+    i2c_set_speed(I2C1, i2c_speed_sm_100k, <span style="color:#ae81ff">8</span>);
+
+	<span style="color:#75715e">/* 100KHz */</span>
+	i2c_set_standard_mode(I2C1);
+
+	<span style="color:#75715e">/* If everything is configured -&gt; enable the peripheral. */</span>
+	i2c_peripheral_enable(I2C1);
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief   sets up the USART with 8N1 - TX only with 9600 Baud
+</span><span style="color:#75715e"> * @note    requires GPIOA and USART1 clocks to be enabled
+</span><span style="color:#75715e"> * @param   void
+</span><span style="color:#75715e"> * @return  void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
+<span style="color:#a6e22e">usart_setup</span>(<span style="color:#66d9ef">void</span>)
+{
+    <span style="color:#75715e">/* Setup GPIO pin GPIO_USART1_RE_TX on GPIO port B for transmit. */</span>
+    gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
+              GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART1_TX);
+
+    <span style="color:#75715e">/* Setup UART parameters. */</span>
+    usart_set_baudrate(USART1, <span style="color:#ae81ff">9600</span>);
+    usart_set_databits(USART1, <span style="color:#ae81ff">8</span>); 
+    usart_set_stopbits(USART1, USART_STOPBITS_1);
+    usart_set_parity(USART1, USART_PARITY_NONE);
+    usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
+    usart_set_mode(USART1, USART_MODE_TX);
+
+    <span style="color:#75715e">/* Finally enable the USART. */</span>
+    usart_enable(USART1);
+}
+
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">timer_setup</span>(<span style="color:#66d9ef">void</span>)
+{
+    <span style="color:#75715e">/* this timer setup is taken 1:1 from the 
+</span><span style="color:#75715e">       timer example of this repository */</span>
+
+    nvic_enable_irq(NVIC_TIM2_IRQ);
+    rcc_periph_reset_pulse(RST_TIM2);
+
+    timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT,
+        TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+
+    timer_set_prescaler(TIM2, (<span style="color:#ae81ff">8000</span><span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>));
+
+	timer_disable_preload(TIM2);
+	timer_continuous_mode(TIM2);
+
+    <span style="color:#75715e">/* with the input frequency being 1000kHz, we can use this
+</span><span style="color:#75715e">       value to control the timer interrupts in seconds. 
+</span><span style="color:#75715e">       1000 = 1     sec 
+</span><span style="color:#75715e">        500 = 0.5   sec
+</span><span style="color:#75715e">        250 = 0.25  sec
+</span><span style="color:#75715e">        125 = 0.125 sec
+</span><span style="color:#75715e">        20  = 0.02  sec == 50 Hz
+</span><span style="color:#75715e">    */</span>
+    
+    timer_set_period(TIM2, <span style="color:#ae81ff">250</span>);
+
+    timer_enable_counter(TIM2);
+    timer_enable_irq(TIM2, TIM_DIER_CC1IE);
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief configure the onboard LED as an output
+</span><span style="color:#75715e"> * @param void
+</span><span style="color:#75715e"> * @return void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">gpio_setup</span>(<span style="color:#66d9ef">void</span>)
+{
+    gpio_set_mode(GPIOC,
+        GPIO_MODE_OUTPUT_2_MHZ,
+        GPIO_CNF_OUTPUT_PUSHPULL,
+        GPIO13
+    );
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief this function reads from the sensor 
+</span><span style="color:#75715e"> * @warning the buffer needs to be 3 bytes in size
+</span><span style="color:#75715e"> * @param p_buf the buffer to read to
+</span><span style="color:#75715e"> * @return void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span> 
+<span style="color:#a6e22e">read_sensor</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>p_buf)
+{
+    <span style="color:#75715e">/*
+</span><span style="color:#75715e">        1. we have to write the value of the register we want
+</span><span style="color:#75715e">           to access into the pointer register. For this example,
+</span><span style="color:#75715e">           we write 0x00, which I called PRB_TEMPERATURE because
+</span><span style="color:#75715e">           we want to read the temperature register @man.
+</span><span style="color:#75715e">        2. after that, we send start and read two bytes.
+</span><span style="color:#75715e">    */</span>
+    <span style="color:#66d9ef">uint8_t</span> temp_reg <span style="color:#f92672">=</span> PRB_TEMPERATURE;
+
+    i2c_transfer7(I2C1, TMP102_DEVICE_ADDR, <span style="color:#f92672">&amp;</span>temp_reg, <span style="color:#ae81ff">1</span>, 
+        <span style="color:#f92672">&amp;</span>p_buf[<span style="color:#ae81ff">0</span>], TEMPERATURE_READ_BYTES);
+
+}
+
+<span style="color:#75715e">/**
+</span><span style="color:#75715e"> * @brief this function sends the sensor data via the UART 
+</span><span style="color:#75715e"> * @param p_buf the buffer to send
+</span><span style="color:#75715e"> * @return void
+</span><span style="color:#75715e"> */</span>
+<span style="color:#66d9ef">static</span> <span style="color:#66d9ef">void</span>
+<span style="color:#a6e22e">send_data</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>buf)
+{
+    <span style="color:#75715e">/*
+</span><span style="color:#75715e">        the temperature reading returns three bytes,
+</span><span style="color:#75715e">        the MSB, LSB and a PEC (CRC-8 checksum), we only
+</span><span style="color:#75715e">        care about the reading to keep things simple so we
+</span><span style="color:#75715e">        only send the raw MSB and LSB.
+</span><span style="color:#75715e">    */</span>
+    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">0</span>]);	
+    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">1</span>]);	
+    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">2</span>]);	
+    usart_send_blocking(USART1, buf[<span style="color:#ae81ff">3</span>]);	
+
+    usart_send_blocking(USART1, <span style="color:#e6db74">&#39;\r&#39;</span>);	
+    usart_send_blocking(USART1, <span style="color:#e6db74">&#39;\n&#39;</span>);	
+}
+
+<span style="color:#66d9ef">void</span> 
+<span style="color:#a6e22e">tim2_isr</span>(<span style="color:#66d9ef">void</span>)
+{
+    <span style="color:#75715e">/* buffer to store the raw sensor values and filtered values 
+</span><span style="color:#75715e">       buffer[0], buffer[1] = raw sensor values
+</span><span style="color:#75715e">       buffer[2], buffer[3] = fp16 with 4 fracbits split into MSB | LSB
+</span><span style="color:#75715e">     */</span>
+
+    <span style="color:#66d9ef">uint8_t</span> buffer[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> { <span style="color:#ae81ff">0x00</span> };
+
+    <span style="color:#66d9ef">if</span>(timer_get_flag(TIM2, TIM_SR_CC1IF))
+    {
+        <span style="color:#75715e">/* clear the interrupt */</span>
+        timer_clear_flag(TIM2, TIM_SR_CC1IF);
+
+        <span style="color:#75715e">/* read from the sensor */</span>
+        read_sensor(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+        
+        <span style="color:#75715e">/* filter data */</span>
+
+        <span style="color:#75715e">/* to fixed point */</span>
+        fp16 temp <span style="color:#f92672">=</span> ( ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">4</span>) <span style="color:#f92672">|</span> ((<span style="color:#66d9ef">uint16_t</span>)buffer[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">4</span>) );
+        <span style="color:#75715e">/* add to buffer */</span>
+        circ_buf_put(<span style="color:#f92672">&amp;</span>g_cbuf, temp);
+        <span style="color:#75715e">/* convolution */</span>
+        fp16 filt <span style="color:#f92672">=</span> circ_buf_convolution(<span style="color:#f92672">&amp;</span>g_cbuf, <span style="color:#f92672">&amp;</span>g_fcoeff[<span style="color:#ae81ff">0</span>]);
+        <span style="color:#75715e">/* to raw bytes */</span>
+        buffer[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( (filt <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
+        buffer[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> (<span style="color:#66d9ef">uint8_t</span>)( filt <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>);
+
+        <span style="color:#75715e">/* send what we read via UART */</span>
+        send_data(<span style="color:#f92672">&amp;</span>buffer[<span style="color:#ae81ff">0</span>]);
+
+        <span style="color:#75715e">/* toggle the LED to see if we&#39;re still alive or not */</span>
+        gpio_toggle(GPIOC, GPIO13);
+    } <span style="color:#75715e">/* if */</span>
+}
+
+<span style="color:#66d9ef">int</span> 
+<span style="color:#a6e22e">main</span>(<span style="color:#66d9ef">void</span>)
+{
+    <span style="color:#66d9ef">int</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+
+    circ_buf_init((circ_buf_t<span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_cbuf);
+
+    <span style="color:#75715e">/* initialize the filter coefficients */</span>
+    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> CIRC_BUFFER_SIZE; i<span style="color:#f92672">++</span>)
+    {
+        g_fcoeff[i] <span style="color:#f92672">=</span> FLOAT2FIXED16(<span style="color:#ae81ff">1.0</span> <span style="color:#f92672">/</span> (<span style="color:#66d9ef">float</span>)CIRC_BUFFER_SIZE);
+    }
+
+	clock_setup();
+	i2c_setup();
+    usart_setup();
+    gpio_setup();
+
+    timer_setup();
+
+	<span style="color:#66d9ef">while</span> (<span style="color:#ae81ff">1</span>) {}
+
+	<span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+}
+</code></pre></div><h1 id="result">Result</h1>
 <p>After compiling this, I wrote a small python script that does a live-plot of the temperature via matplotlib:</p>
 <p><img src="/static/f89f005878a42efd0709b35481591cf8.png" alt="image"></p>
 <p>The red line is the raw temperature data, without filtering. The green line shows the temperature data with the moving average filter applied, in this case, it is a 4-point moving average filter (CIRC_BUFFER_SIZE = 4).</p>
