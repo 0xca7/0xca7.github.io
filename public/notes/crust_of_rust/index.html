@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crust of Rust - Notes | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Crust of Rust - Notes</span></h1>
+
+<h2 class="date">2024/01/13</h2>
+</div>
+
+<main>
+<p>These are my notes for Crust of Rust:
+<a href="https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa">https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa</a></p>
+<hr>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <a href="#memoryorderingandatomics">Memory Ordering and Atomics</a></li>
+<li><input checked="" disabled="" type="checkbox"> <a href="#lifetimes">Lifetimes</a></li>
+<li><input checked="" disabled="" type="checkbox"> <a href="#smarts">SmartPointers and Interior Mutability</a></li>
+</ul>
+<h1 id="memory-ordering-and-atomics">Memory Ordering and Atomics</h1>
+<p><!-- raw HTML omitted --><!-- raw HTML omitted --></p>
+<p>Why do we need atomics?</p>
+<ul>
+<li>shared access to a memory value needs additional information in order for threads to synchronize and fix what guarantees are in place</li>
+<li>thread-safety: data races and undefined behavior is mitigated</li>
+<li>having an extra API has the added benefit of highlighting that we are issuing different instructions to the CPU: <code>bool &lt;-&gt; AtomicBool</code></li>
+</ul>
+<p>Memory Model</p>
+<p>&hellip; Rust does not have a defined memory model =&gt; this is not that good for atomics etc, but no problem because we use LLVM and follow the C memory model.</p>
+<p>-&gt; we can follow the C++ memory model specification, this is very readable.</p>
+<p>Sharing <code>atomics</code> between threads</p>
+<ol>
+<li>leak a <code>Box</code></li>
+<li>use an <code>Arc</code></li>
+</ol>
+<hr>
+<p><code>AtomicUsize</code> - same memory representation as a <code>usize</code>, but with a different set of methods. You can never access the value directly.</p>
+<p>You can&rsquo;t share the <code>Atomic</code> value between threads, they are placed on the stack, so you have to use the heap (<code>Box</code> or <code>Arc</code> it).</p>
+<p>The methods of <code>AtomicUsize</code> use shared references to self, with which you can manipulate the value. For a normal usize, you can&rsquo;t have that.</p>
+<p><code>load</code> - takes the value in the <code>AtomicUsize</code> and returns a <code>usize</code>
+<code>store</code> - takes a <code>usize</code>, stores it in the <code>AtomicUsize</code></p>
+<p>These methods want an <code>Ordering</code>. An Ordering tells the compiler which set of guarantees which you expect for this particular memory access.</p>
+<p><code>fetch_add</code> will atomically add, there are also a lot of other atomic methods in <code>AtomicUsize</code>.</p>
+<hr>
+<p>Building a Mutex</p>
+<p>An error when implementing a Mutex.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#e6db74">/// a spinlock, which we shouldn&#39;t use, as spinlocks are bad in general
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">/// there&#39;s an error in here.
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">with_lock</span><span style="color:#f92672">&lt;</span>R<span style="color:#f92672">&gt;</span>(<span style="color:#f92672">&amp;</span>self, f: <span style="color:#a6e22e">impl</span> FnOnce(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> T) -&gt; <span style="color:#a6e22e">R</span>) -&gt; <span style="color:#a6e22e">R</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span> self.locked.load(Ordering::Relaxed) <span style="color:#f92672">!=</span> <span style="color:#66d9ef">UNLOCKED</span> {}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// ERROR: inbetween the load and the store, maybe another
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">//        thread runs here.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	self.locked.store(<span style="color:#66d9ef">LOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// SAFETY: we hold the lock, thus we can create a mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get()
+</span></span><span style="display:flex;"><span>	}); 
+</span></span><span style="display:flex;"><span>	self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>	ret
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We fix this with <code>compare_exchange</code>. The race is between <code>load</code> and <code>store</code>, so we avoid the race with an atomic <code>compare_exchange</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#e6db74">/// takes a function that it calls as soon as it has the lock
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">with_lock</span><span style="color:#f92672">&lt;</span>R<span style="color:#f92672">&gt;</span>(<span style="color:#f92672">&amp;</span>self, f: <span style="color:#a6e22e">impl</span> FnOnce(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> T) -&gt; <span style="color:#a6e22e">R</span>) -&gt; <span style="color:#a6e22e">R</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span> self.locked.compare_exchange(
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">UNLOCKED</span>, <span style="color:#75715e">// what the current should be for us to update it
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">LOCKED</span>,  <span style="color:#75715e">// what it should be set to, if it is what the first arg was
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		Ordering::Relaxed, 
+</span></span><span style="display:flex;"><span>		Ordering::Relaxed).is_err() {}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// SAFETY: we hold the lock, thus we can create a mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get()
+</span></span><span style="display:flex;"><span>	}); 
+</span></span><span style="display:flex;"><span>	self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>	ret
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>If all CPUs spin are trying to get the lock via <code>compare_exchange</code> (get exclusive access to the boolean), the cores have to cooperate (expensive) to check the value each time - this is expensive.</p>
+<p>Check out the <strong>MESI protocol</strong> - this explains well why this is expensive.</p>
+<p>Often spinlocks do this:</p>
+<pre tabindex="0"><code>while COMPARE_EXCHANGE(...) { &lt;- if we failed to get the lock, do LOAD
+	while LOAD(...) // &lt;- read only, so more efficient
+}
+</code></pre><p><code>compare_exchange_weak</code> - difference is <code>compare_exchange</code> is only allowed to fail if the <code>current</code> value you pass in does not match the current value of the variable. <code>compare_exchange_weak</code> is allowed to fail spuriously. Even if the <code>current</code> value matches the current value of the variable.</p>
+<p>Why do we have this?</p>
+<ul>
+<li>x86 implements a <code>compare-and-swap</code> instruction</li>
+<li>on ARM: <code>LDREX</code> and <code>STREX</code> (load and store exclusive) STREX will only store if exclusive access to the memory location is still held, if not the instruction will fail.</li>
+</ul>
+<p>That&rsquo;s why we need <code>compare_exchange_weak</code>. On ARM <code>compare_exchange</code> is implemented using a loop of LDREX and STREX. (this is more efficient than one instruction for <code>compare-and-swap</code> in some cases). <code>compare_exchange_weak</code> is <code>LDREX, STREX</code> - if you&rsquo;re not calling <code>compare_exchange</code> in a loop, use <code>compare_exchange_weak</code>.</p>
+<hr>
+<p>Ordering</p>
+<p>This is our current function</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#e6db74">/// takes a function that it calls as soon as it has the lock
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">with_lock</span><span style="color:#f92672">&lt;</span>R<span style="color:#f92672">&gt;</span>(<span style="color:#f92672">&amp;</span>self, f: <span style="color:#a6e22e">impl</span> FnOnce(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> T) -&gt; <span style="color:#a6e22e">R</span>) -&gt; <span style="color:#a6e22e">R</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">while</span> self.locked.compare_exchange_weak(
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">UNLOCKED</span>, <span style="color:#75715e">// what the current should be for us to update it
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">LOCKED</span>,  <span style="color:#75715e">// what it should be set to, if it is what the first arg was
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		Ordering::Relaxed, 
+</span></span><span style="display:flex;"><span>		Ordering::Relaxed).is_err() {
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// only read, no compare and exchange
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#66d9ef">while</span> self.locked.load(Ordering::Relaxed) <span style="color:#f92672">==</span> <span style="color:#66d9ef">LOCKED</span> {
+</span></span><span style="display:flex;"><span>				thread::yield_now();
+</span></span><span style="display:flex;"><span>			}
+</span></span><span style="display:flex;"><span>			thread::yield_now();
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// SAFETY: we hold the lock, thus we can create a mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get()
+</span></span><span style="display:flex;"><span>	}); 
+</span></span><span style="display:flex;"><span>	self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>	ret
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>At this point nothing fails. But there is still a problem. The reason is the <code>Ordering</code>.</p>
+<p>An <code>Ordering</code> is an allowed behavior. <code>Relaxed</code> means there are pretty much no guarantees, other than that the operation is atomic.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">too_relaxed</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> x: <span style="color:#66d9ef">&amp;</span>&#39;static <span style="color:#a6e22e">_</span> <span style="color:#f92672">=</span> Box::leak(Box::new(AtomicUsize::new(<span style="color:#ae81ff">0</span>)));
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> y: <span style="color:#66d9ef">&amp;</span>&#39;static <span style="color:#a6e22e">_</span> <span style="color:#f92672">=</span> Box::leak(Box::new(AtomicUsize::new(<span style="color:#ae81ff">0</span>)));
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> t1 <span style="color:#f92672">=</span> spawn(<span style="color:#66d9ef">move</span> <span style="color:#f92672">||</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// read y, store to x
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">let</span> r1 <span style="color:#f92672">=</span> y.load(Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>		x.store(r1, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>		r1
+</span></span><span style="display:flex;"><span>	});
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> t2 <span style="color:#f92672">=</span> spawn(<span style="color:#66d9ef">move</span> <span style="color:#f92672">||</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// read x, store to y
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">let</span> r2 <span style="color:#f92672">=</span> x.load(Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>		y.store(<span style="color:#ae81ff">42</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span>		r2
+</span></span><span style="display:flex;"><span>	});
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> r1 <span style="color:#f92672">=</span> t1.join().unwrap();
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> r2 <span style="color:#f92672">=</span> t2.join().unwrap();
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// it is possible that r1 == r2 == 42
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// even though the store of 42 happens after r2 is read
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>This is surprising, <code>r2</code> should hold the value of <code>x</code> and is set before <code>y</code> is set to 42. <code>Relaxed</code> gives no guarantees about what values a thread can read from something another thread wrote.</p>
+<p>The load of <code>x</code> in <code>let r2 = x.load(Ordering::Relaxed);</code> can see any value of <code>x</code>, which includes 42.</p>
+<p>The modification order&hellip;</p>
+<pre tabindex="0"><code>MO(x): 0 42 &lt;-- modification order for x
+MO(y): 0 42
+</code></pre><p>&hellip; here means that any value from the set (0,42) can be chosen for x.
+(The compiler can choose what to do first - there is no sequencing happening in the code after all, one thing does not have to happen after the other).</p>
+<p>This makes safe locks impossible. Imagine the lock being activated after the lock should have already taken place - in that case, there is no lock.</p>
+<hr>
+<p>Acquire/Release Memory Ordering</p>
+<p>These memory orderings are used for shared resources.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">// this is correct, work with the value v, then release the lock
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get() });
+</span></span><span style="display:flex;"><span>self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// with relaxed, this can happen, we unlock, then work with the value
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Relaxed);
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get() });
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// we fix this with Release memory ordering
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">let</span> ret <span style="color:#f92672">=</span> f(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.v.get() }); 
+</span></span><span style="display:flex;"><span>self.locked.store(<span style="color:#66d9ef">UNLOCKED</span>, Ordering::Release);
+</span></span></code></pre></div><p>We need to couple this with <code>Acquire</code> - see docs.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">while</span> self.locked.compare_exchange_weak(
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">UNLOCKED</span>, <span style="color:#75715e">// what the current should be for us to update it
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">LOCKED</span>,  <span style="color:#75715e">// what it should be set to, if it is what the first arg was
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	Ordering::Acquire, 
+</span></span><span style="display:flex;"><span>	Ordering::Relaxed).is_err() 
+</span></span><span style="display:flex;"><span>	{
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// only read, no compare and exchange
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">while</span> self.locked.load(Ordering::Relaxed) <span style="color:#f92672">==</span> <span style="color:#66d9ef">LOCKED</span> {
+</span></span><span style="display:flex;"><span>			thread::yield_now();
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>		thread::yield_now();
+</span></span><span style="display:flex;"><span>	}
+</span></span></code></pre></div><p><code>AcqRel</code> - this is used for operations that do a read and a write, like compare exchange, this says &ldquo;do the load with acquire semantics and the store with release semantics&rdquo;. This is used when you do a <code>fetch_add</code> or similar - when you have single operations.</p>
+<hr>
+<h4 id="fetch-operations">fetch Operations</h4>
+<p><code>fetch</code> operations are gentler variants of <code>compare_and_exchange</code> - instead of saying what the new value should be, tell the CPU how to compute the new value. in <code>compare_and_exchange</code> the current value is checked, if it is not the expected value, it will fail. <code>fetch_add</code> will not, it will tell you what the value was and the add to to, but not check the value beforehand.</p>
+<hr>
+<h4 id="seqcst">SeqCst</h4>
+<p>see video explanation + code, it&rsquo;s a better walkthrough that could ever be done here in text.</p>
+<p>It comes down to this:</p>
+<ul>
+<li>acquire and release impose an order on loads and stores</li>
+<li>when multiple of these orderings are applied to variables used in context, things get confusing</li>
+<li>for example: say x is loaded, acquire imposes an order, but x has multiple previous values. this can load to problems, which value is chosen? =&gt; we need a clear ordering here, that is <code>SeqCst</code></li>
+</ul>
+<p>All memory orderings impose a &ldquo;what happens before&rdquo; relationship for things happening concurrently.</p>
+<hr>
+<h4 id="loom">loom</h4>
+<p>is a rust thread sanitizer - a strategy for taking a concurrent program, instrumenting it and testing it. This feeds you back <em>possible legal values</em> - as loom executes, it will run all possible thread interleavings, all possible memory orderings.</p>
+<hr>
+<h4 id="atomic-fences---memory-barriers">atomic fences - Memory Barriers</h4>
+<p>there is a <code>fence</code> in the atomic module in the standard library. You can also pass a constant between threads - other than leaking a box or using an Arc.</p>
+<p><code>fence</code> is an atomic operation, that establishes a happens before relationship between two threads, but does not talk about a specific memory location. So, not like <code>load</code> and <code>store</code> with <code>Acquire</code>. A <code>fence</code> says: Synchronize with all other threads that do a <code>fence</code>.</p>
+<p>See the C++ reference above for this.</p>
+<hr>
+<h4 id="volatile">volatile</h4>
+<p><code>volatile</code> keyword is unrelated to <code>atomics</code>. There is a <code>std::ptr::read_volatile</code> and a write.</p>
+<hr>
+<h4 id="atomicptr">AtomicPtr</h4>
+<p>&hellip; is not really special. The methods are specialized towards pointers, that&rsquo;s it.</p>
+<hr>
+<h1 id="lifetimes">Lifetimes</h1>
+<p><!-- raw HTML omitted --> <!-- raw HTML omitted --></p>
+<p><a href="https://www.youtube.com/watch?v=rAl-9HwD858&amp;list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa">https://www.youtube.com/watch?v=rAl-9HwD858&amp;list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa</a></p>
+<p>Anonymous Lifetimes: places where you tell the compiler to <em>guess</em> the lifetime</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> Foo {
+</span></span><span style="display:flex;"><span>	<span style="color:#e6db74">/// compiler can guess the lifetime of the str, as the only other lifetime is to &amp;self, 
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span>	<span style="color:#e6db74">/// so str lives as long as self lives.
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span>	<span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">get_ref</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#66d9ef">&amp;</span>&#39;_ <span style="color:#66d9ef">str</span> {}
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">/// using anonymous lifetimes to simplify
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">foo</span>(x: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>, y: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;b</span> <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span> {}
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">/// in the return value, the anonymous lifetime means &#34;infer the lifetime&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">foo</span>(x: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>, y: <span style="color:#66d9ef">&amp;</span>&#39;_ <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#66d9ef">&amp;</span>&#39;_ <span style="color:#66d9ef">str</span> {}
+</span></span></code></pre></div><p>Named Lifetimes: you tell the compiler what the lifetimes are <code>&lt;'a&gt;</code>
+Special Lifetimes: <code>'static</code> - lives as long as the program</p>
+<p>Error Message: <code>lifetime of reference outlives lifetime of borrowed content</code></p>
+<p>This means that <code>haystack</code>&rsquo;s lifetime is not the same as <code>remainder</code>&rsquo;s lifetime. Same goes for delimiter. What this tells us is the following:</p>
+<ul>
+<li>at the moment <code>new</code> is called, haystack or delimiter could be de-allocated</li>
+<li>if that happens, the references of remainder and delimiter are not valid anymore, but StrSplit still exists with these references!</li>
+<li>we need to specify a lifetime for haystack and delimiter in order to construct a relationship between the pointers we pass in and the pointers inside the struct</li>
+</ul>
+<p>The fix is easy: Tell Rust that the internal references live as long as the external ones:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(haystack: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>, delimiter: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            remainder: <span style="color:#a6e22e">haystack</span>,
+</span></span><span style="display:flex;"><span>            delimiter
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>That means <em>haystack and delimiter live at least as a long is the internal remainder and delimiter</em>.</p>
+<p>Why are there TWO <code>&lt;'a&gt;</code>? Same reason as for below:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Foo</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// this is wrong, the compiler says: &#34;you&#39;re using a type T here, but I don&#39;t know that type&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span> Foo<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {}
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// this tells the compiler that the impl block is generic over T
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Foo<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {}
+</span></span></code></pre></div><p>What is the <code>ref mut</code> here?</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">next</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) -&gt; Option<span style="color:#f92672">&lt;</span>Self::Item<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(<span style="color:#66d9ef">ref</span> <span style="color:#66d9ef">mut</span> remainder) <span style="color:#f92672">=</span> self.remainder {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// if there is some delimiter in the remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(next_delim) <span style="color:#f92672">=</span> remainder.find(self.delimiter) {
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#66d9ef">let</span> until_delim <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[<span style="color:#f92672">..</span>next_delim];
+</span></span><span style="display:flex;"><span>			<span style="color:#f92672">*</span>remainder <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[(next_delim <span style="color:#f92672">+</span> self.delimiter.len())<span style="color:#f92672">..</span>];
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">return</span> Some(until_delim);
+</span></span><span style="display:flex;"><span>		} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>			self.remainder.take()
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>	} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>		None
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li><code>ref mut</code> says: if <code>self.remainder</code> is some, do not move the value out of <code>self.remainder</code>, give me a mutable reference to the value inside of it</li>
+<li>with no <code>ref mut</code>: the value moves out of <code>self.remainder</code></li>
+</ul>
+<p>What does <code>take()</code> do?</p>
+<pre tabindex="0"><code>impl &lt;T&gt; Option&lt;T&gt; {
+	/// if the option is None, it returns None
+	/// if it is Some, it returns the Option and sets the Option inside to None
+	fn take(&amp;mut self) -&gt; Option&lt;T&gt;
+}
+</code></pre><p>Error: <code>returns a value referencing data owned by current function</code></p>
+<p>The problem is in the <code>format!(&quot;{}&quot;, c)</code>:</p>
+<ul>
+<li>this is the <code>delimiter</code> argument to <code>StrSplit::new</code></li>
+<li>currently, this argument has the same lifetime as the <code>haystack</code></li>
+<li>we are giving it something that does not have the same lifetime, namely <code>format!(...)</code></li>
+<li><code>format!(...)</code> has the shorter lifetime, as such it is seen as <code>&lt;'a&gt;</code></li>
+</ul>
+<p>We have two options:</p>
+<ul>
+<li>make <code>delimiter</code> a <code>String</code></li>
+<li>introduce a second lifetime</li>
+</ul>
+<p>Until now we have:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">// #![warn(missing_debug_implementations, missing_docs)]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[derive(Debug)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">StrSplit</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    remainder: Option<span style="color:#f92672">&lt;&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span><span style="color:#f92672">&gt;</span>, <span style="color:#75715e">// missing lifetime: must live as long as the haystack 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    delimiter: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>, <span style="color:#75715e">// missing lifetime: lives as long as remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(haystack: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>, delimiter: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            remainder: Some(haystack),
+</span></span><span style="display:flex;"><span>            delimiter
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> Iterator <span style="color:#66d9ef">for</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Item</span> <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>; <span style="color:#75715e">// missing lifetime: lives as long as what it references
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">next</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) -&gt; Option<span style="color:#f92672">&lt;</span>Self::Item<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(<span style="color:#66d9ef">ref</span> <span style="color:#66d9ef">mut</span> remainder) <span style="color:#f92672">=</span> self.remainder {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there is some delimiter in the remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(next_delim) <span style="color:#f92672">=</span> remainder.find(self.delimiter) {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">let</span> until_delim <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[<span style="color:#f92672">..</span>next_delim];
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// need to dereference, because remainder is &amp;mut &amp;str, we need
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">// the new remainder should be put where remainder is pointing to
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#f92672">*</span>remainder <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[(next_delim <span style="color:#f92672">+</span> self.delimiter.len())<span style="color:#f92672">..</span>];
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> Some(until_delim);
+</span></span><span style="display:flex;"><span>            } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>                self.remainder.take()
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">/// ERROR: we&#39;ll not compile because of the lifetime problem here.
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74"></span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char</span>(s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>, c: <span style="color:#66d9ef">char</span>) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span> {
+</span></span><span style="display:flex;"><span>    StrSplit::new(s, <span style="color:#f92672">&amp;</span>format!(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span>, c)).next()
+</span></span><span style="display:flex;"><span>        .expect(<span style="color:#e6db74">&#34;strsplit always gives at least one result&#34;</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[cfg(test)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">mod</span> tests {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">use</span> <span style="color:#66d9ef">super</span>::<span style="color:#f92672">*</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">it_works</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d e&#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;e&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">tail</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d &#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char_test</span>() {
+</span></span><span style="display:flex;"><span>        assert_eq!(until_char(<span style="color:#e6db74">&#34;hello world&#34;</span>, <span style="color:#e6db74">&#39;o&#39;</span>), <span style="color:#e6db74">&#34;hell&#34;</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><hr>
+<h2 id="multiple-lifetimes">Multiple Lifetimes</h2>
+<p>Usually you do not need multiple lifetimes, it&rsquo;s very rare.</p>
+<p>Here is the Fix with multiple lifetimes:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">// #![warn(missing_debug_implementations, missing_docs)]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[derive(Debug)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">StrSplit</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, <span style="color:#a6e22e">&#39;delimiter</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    remainder: Option<span style="color:#f92672">&lt;&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span><span style="color:#f92672">&gt;</span>, <span style="color:#75715e">// missing lifetime: must live as long as the haystack 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    delimiter: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;delimiter</span> <span style="color:#66d9ef">str</span>, <span style="color:#75715e">// missing lifetime: lives as long as remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, <span style="color:#a6e22e">&#39;delimiter</span><span style="color:#f92672">&gt;</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, <span style="color:#a6e22e">&#39;delimiter</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(haystack: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span>, delimiter: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;delimiter</span> <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            remainder: Some(haystack),
+</span></span><span style="display:flex;"><span>            delimiter
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, <span style="color:#a6e22e">&#39;delimiter</span><span style="color:#f92672">&gt;</span> Iterator <span style="color:#66d9ef">for</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, <span style="color:#a6e22e">&#39;delimiter</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Item</span> <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span>; <span style="color:#75715e">// this is only tied to the lifetime of haystack
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">next</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) -&gt; Option<span style="color:#f92672">&lt;</span>Self::Item<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(<span style="color:#66d9ef">ref</span> <span style="color:#66d9ef">mut</span> remainder) <span style="color:#f92672">=</span> self.remainder {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there is some delimiter in the remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(next_delim) <span style="color:#f92672">=</span> remainder.find(self.delimiter) {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">let</span> until_delim <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[<span style="color:#f92672">..</span>next_delim];
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// need to dereference, because remainder is &amp;mut &amp;str, we need
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">// the new remainder should be put where remainder is pointing to
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#f92672">*</span>remainder <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[(next_delim <span style="color:#f92672">+</span> self.delimiter.len())<span style="color:#f92672">..</span>];
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> Some(until_delim);
+</span></span><span style="display:flex;"><span>            } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>                self.remainder.take()
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char</span>(s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>, c: <span style="color:#66d9ef">char</span>) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span> {
+</span></span><span style="display:flex;"><span>    StrSplit::new(s, <span style="color:#f92672">&amp;</span>format!(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span>, c)).next()
+</span></span><span style="display:flex;"><span>        .expect(<span style="color:#e6db74">&#34;strsplit always gives at least one result&#34;</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[cfg(test)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">mod</span> tests {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">use</span> <span style="color:#66d9ef">super</span>::<span style="color:#f92672">*</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">it_works</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d e&#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;e&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">tail</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d &#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char_test</span>() {
+</span></span><span style="display:flex;"><span>        assert_eq!(until_char(<span style="color:#e6db74">&#34;hello world&#34;</span>, <span style="color:#e6db74">&#39;o&#39;</span>), <span style="color:#e6db74">&#34;hell&#34;</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Getting rid of the allocation:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span>StrSplit::new(s, <span style="color:#f92672">&amp;</span>format!(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span>, c)).next()
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// same as this:
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">let</span> delim <span style="color:#f92672">=</span> format!(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span>, c);    <span style="color:#75715e">// &lt;== this is an allocation
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>StrSplit::new(s, delim).next()
+</span></span></code></pre></div><p>We make delimiter generic + add a trait to it. All we need to know from delimiter is where the next occurrence of the delimiter is.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">// #![warn(missing_debug_implementations, missing_docs)]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[derive(Debug)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">StrSplit</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, D<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    remainder: Option<span style="color:#f92672">&lt;&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span><span style="color:#f92672">&gt;</span>, <span style="color:#75715e">// missing lifetime: must live as long as the haystack 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    delimiter: <span style="color:#a6e22e">D</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, D<span style="color:#f92672">&gt;</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, D<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(haystack: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span>, delimiter: <span style="color:#a6e22e">D</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            remainder: Some(haystack),
+</span></span><span style="display:flex;"><span>            delimiter
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">trait</span> Delimiter {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">find_next</span>(<span style="color:#f92672">&amp;</span>self, s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>) -&gt; Option<span style="color:#f92672">&lt;</span>(<span style="color:#66d9ef">usize</span>, <span style="color:#66d9ef">usize</span>)<span style="color:#f92672">&gt;</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> Delimiter <span style="color:#66d9ef">for</span> <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">str</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">find_next</span>(<span style="color:#f92672">&amp;</span>self, s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>) -&gt; Option<span style="color:#f92672">&lt;</span>(<span style="color:#66d9ef">usize</span>, <span style="color:#66d9ef">usize</span>)<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>        s.find(self).map(<span style="color:#f92672">|</span>start<span style="color:#f92672">|</span> {
+</span></span><span style="display:flex;"><span>            (start, start <span style="color:#f92672">+</span> self.len())
+</span></span><span style="display:flex;"><span>        })
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> Delimiter <span style="color:#66d9ef">for</span> <span style="color:#66d9ef">char</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">find_next</span>(<span style="color:#f92672">&amp;</span>self, s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>) -&gt; Option<span style="color:#f92672">&lt;</span>(<span style="color:#66d9ef">usize</span>, <span style="color:#66d9ef">usize</span>)<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>        s.char_indices()
+</span></span><span style="display:flex;"><span>            .find(<span style="color:#f92672">|</span>(_,c)<span style="color:#f92672">|</span> c <span style="color:#f92672">==</span> self)
+</span></span><span style="display:flex;"><span>            .map(<span style="color:#f92672">|</span>(start, _)<span style="color:#f92672">|</span> (start, start<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> <span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, D<span style="color:#f92672">&gt;</span> Iterator <span style="color:#66d9ef">for</span> StrSplit<span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;haystack</span>, D<span style="color:#f92672">&gt;</span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">where</span> 
+</span></span><span style="display:flex;"><span>    D: <span style="color:#a6e22e">Delimiter</span>
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Item</span> <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span><span style="color:#a6e22e">&#39;haystack</span> <span style="color:#66d9ef">str</span>; <span style="color:#75715e">// this is only tied to the lifetime of haystack
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">next</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) -&gt; Option<span style="color:#f92672">&lt;</span>Self::Item<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some(<span style="color:#66d9ef">ref</span> <span style="color:#66d9ef">mut</span> remainder) <span style="color:#f92672">=</span> self.remainder {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there is some delimiter in the remainder
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> Some((delim_start, delim_end)) <span style="color:#f92672">=</span> self.delimiter.find_next(<span style="color:#f92672">&amp;</span>remainder) {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">let</span> until_delim <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[<span style="color:#f92672">..</span>delim_start];
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// need to dereference, because remainder is &amp;mut &amp;str, we need
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">// the new remainder should be put where remainder is pointing to
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#f92672">*</span>remainder <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>remainder[delim_end<span style="color:#f92672">..</span>];
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">return</span> Some(until_delim);
+</span></span><span style="display:flex;"><span>            } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>                self.remainder.take()
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>        
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char</span>(s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>, c: <span style="color:#66d9ef">char</span>) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// now we can just pass the char instead having to allocate
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    StrSplit::new(s, c).next()
+</span></span><span style="display:flex;"><span>        .expect(<span style="color:#e6db74">&#34;strsplit always gives at least one result&#34;</span>)
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[cfg(test)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">mod</span> tests {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">use</span> <span style="color:#66d9ef">super</span>::<span style="color:#f92672">*</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">it_works</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d e&#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;e&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">tail</span>() {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> haystack <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;a b c d &#34;</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> letters <span style="color:#f92672">=</span> StrSplit::new(haystack, <span style="color:#e6db74">&#34; &#34;</span>);
+</span></span><span style="display:flex;"><span>        assert!(letters.eq(vec![<span style="color:#e6db74">&#34;a&#34;</span>, <span style="color:#e6db74">&#34;b&#34;</span>, <span style="color:#e6db74">&#34;c&#34;</span>, <span style="color:#e6db74">&#34;d&#34;</span>, <span style="color:#e6db74">&#34;&#34;</span>].into_iter()));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">#[test]</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">until_char_test</span>() {
+</span></span><span style="display:flex;"><span>        assert_eq!(until_char(<span style="color:#e6db74">&#34;hello world&#34;</span>, <span style="color:#e6db74">&#39;o&#39;</span>), <span style="color:#e6db74">&#34;hell&#34;</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><hr>
+<h1 id="smart-pointers-and-interior-mutability">Smart Pointers and Interior Mutability</h1>
+<p><!-- raw HTML omitted --> <!-- raw HTML omitted --></p>
+<p>The top level module is <code>std::cell</code>.</p>
+<p>Sometimes you need multiple references to an object AND mutate it. The idea here is a type that looks immutable from the outside, but it has methods that allow you to mutate the internals.</p>
+<hr>
+<p><code>std::cell::Cell</code> - <a href="https://doc.rust-lang.org/std/cell/struct.Cell.html">https://doc.rust-lang.org/std/cell/struct.Cell.html</a></p>
+<p>In this example, you can see that <code>Cell&lt;T&gt;</code> enables mutation inside an immutable struct. In other words, it enables “interior mutability”.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">use</span> std::cell::Cell;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">SomeStruct</span> {
+</span></span><span style="display:flex;"><span>    regular_field: <span style="color:#66d9ef">u8</span>,
+</span></span><span style="display:flex;"><span>    special_field: <span style="color:#a6e22e">Cell</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">u8</span><span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">let</span> my_struct <span style="color:#f92672">=</span> SomeStruct {
+</span></span><span style="display:flex;"><span>    regular_field: <span style="color:#ae81ff">0</span>,
+</span></span><span style="display:flex;"><span>    special_field: <span style="color:#a6e22e">Cell</span>::new(<span style="color:#ae81ff">1</span>),
+</span></span><span style="display:flex;"><span>};
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">let</span> new_value <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// ERROR: `my_struct` is immutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// my_struct.regular_field = new_value;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// WORKS: although `my_struct` is immutable, `special_field` is a `Cell`,
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// which can always be mutated
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>my_struct.special_field.set(new_value);
+</span></span><span style="display:flex;"><span>assert_eq!(my_struct.special_field.get(), new_value);
+</span></span></code></pre></div><p>Key Point: You can never get a pointer into the cell. Thus, there aren&rsquo;t multiple references to one thing, as such, mutating the thing inside is ok. Also, <code>cell</code> does not implement <code>Sync</code> - that means if you have a reference to a cell, you can never give that reference to a different thread. Thus, there can only one thread that has a reference to the cell.</p>
+<p>The core of most of these &ldquo;interior mutability&rdquo; types is <code>std::cell::UnsafeCell</code>. You can use this to get raw pointers to the insides of things. You have to make sure that the unsafe access is indeed safe.</p>
+<p>*The only way to go from a shared reference to an exclusive reference is by <code>std::cell::UnsafeCell</code> - we can&rsquo;t cast a shared to an exclusive reference. <code>UnsafeCell</code> is something that gives the compiler special information, in principle, <code>UnsafeCell&lt;T&gt;</code> is just a <code>T</code> *</p>
+<p>Cell is used for smaller values, numbers, which need to be mutated from multiple different places. It&rsquo;s often used with thread-locals - for example for a thread-local state.</p>
+<p>We could implement the setting of a value for cell like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">set</span>(<span style="color:#f92672">&amp;</span>self, value: <span style="color:#a6e22e">T</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// get() gives a raw exclusive pointer to the inner thing
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// dereference of a raw pointer is unsafe, which get() does.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">unsafe</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#f92672">*</span>self.value.get() <span style="color:#f92672">=</span> value;
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>But this is wrong, there is nothing that really prevents us from using the cell in additional threads.
+Also, this can also go wrong with a single thread</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">let</span> x <span style="color:#f92672">=</span> Cell::new(string::from(<span style="color:#e6db74">&#34;test&#34;</span>));
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">let</span> first <span style="color:#f92672">=</span> x.get();
+</span></span><span style="display:flex;"><span>x.set(String::new());          <span style="color:#75715e">// &lt;-- the reference stored in first is now gone
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>x.set(String::from(<span style="color:#e6db74">&#34;world&#34;</span>));
+</span></span><span style="display:flex;"><span>println!(<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{first}</span><span style="color:#e6db74">&#34;</span>)            <span style="color:#75715e">// this prints &#34;world&#34;, but not &#34;test&#34; the pointer we took out now points somewhere else!
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// this is almost like a use-after-free - that is bad and can lead to undefined behavior
+</span></span></span></code></pre></div><p>Now, the fixed, correct <code>Cell::get</code> never gives out the reference, but merely a copy:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">get</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#a6e22e">T</span> 
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">where</span> 
+</span></span><span style="display:flex;"><span>		T: Copy 
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">*</span>self.value.get() }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The full <code>Cell</code> with safety comments:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Cell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    value: <span style="color:#a6e22e">UnsafeCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Cell<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(value: <span style="color:#a6e22e">T</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Cell { 
+</span></span><span style="display:flex;"><span>            value: <span style="color:#a6e22e">UnsafeCell</span>::new(value) 
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">set</span>(<span style="color:#f92672">&amp;</span>self, value: <span style="color:#a6e22e">T</span>) {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// get() gives a raw exclusive pointer to the inner thing
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">// dereference of a raw pointer is unsafe, which get() does.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">// SAFETY: we know nobody else is concurrently mutating self.value because
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         cell is !Sync (this is implied by UnsafeCell, which is !Sync)
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">// SAFETY: we can never invalidate a reference, because we don&#39;t give
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         one out
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">unsafe</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span>self.value.get() <span style="color:#f92672">=</span> value;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">get</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#a6e22e">T</span> 
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">where</span> 
+</span></span><span style="display:flex;"><span>            T: Copy 
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// SAFETY: we know nobody else is modifying this value, since only one
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         thread can execute this (because of !Sync)
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">*</span>self.value.get() }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><hr>
+<p><code>RefCell</code> - <a href="https://doc.rust-lang.org/std/cell/struct.RefCell.html">https://doc.rust-lang.org/std/cell/struct.RefCell.html</a></p>
+<p><em>A mutable memory location with dynamically checked borrow rules</em>
+Normally in Rust, borrow checking is done at compile time. RefCell lets you check at runtime if anyone else is mutating something (Trees, Graph Traversal). This is safe dynamic borrow checking.</p>
+<p>A naive implementation:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">use</span> std::cell::UnsafeCell;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">enum</span> <span style="color:#a6e22e">RefState</span> {
+</span></span><span style="display:flex;"><span>    Unshared,
+</span></span><span style="display:flex;"><span>    Shared(<span style="color:#66d9ef">usize</span>),      <span style="color:#75715e">// immutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    Exclusive           <span style="color:#75715e">// mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">RefCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    value: <span style="color:#a6e22e">UnsafeCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>    state: <span style="color:#a6e22e">RefState</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> RefCell<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(value: <span style="color:#a6e22e">T</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            value: <span style="color:#a6e22e">UnsafeCell</span>::new(value),
+</span></span><span style="display:flex;"><span>            state: <span style="color:#a6e22e">RefState</span>::Unshared,
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;&amp;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">match</span> self.state {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have not given out any references, we can give a shared one
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Unshared <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state <span style="color:#f92672">=</span> RefState::Shared(<span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.value.get() }
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// multiple shared references are ok as well
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Shared(n) <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state <span style="color:#f92672">=</span> RefState::Shared(n<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.value.get() }
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there&#39;s already a mutable refernce given out, we can&#39;t give
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// another one out.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Exclusive <span style="color:#f92672">=&gt;</span> None,
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow_mut</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;&amp;</span><span style="color:#66d9ef">mut</span> T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> RefState::Unshared <span style="color:#f92672">=</span> self.state {
+</span></span><span style="display:flex;"><span>            self.state <span style="color:#f92672">=</span> RefState::Exclusive;
+</span></span><span style="display:flex;"><span>            Some(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.value.get() })
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have given out ANY reference, it&#39;s not ok to give out
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// a mutable reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><ul>
+<li>this cannot be thread-safe, as the <code>RefState::Shared(n)</code> reference count is not thread-safe</li>
+<li>have a look at <code>borrow</code> and <code>borrow_mut</code> - this cannot work, we change the internal value <code>RefCell::state</code> but we have an immutable reference</li>
+<li>note that <code>RefCell</code> is <code>!Sync</code> - implied by <code>UnsafeCell</code></li>
+</ul>
+<p>This leaves us with:</p>
+<ul>
+<li>we don&rsquo;t need to be thread-safe, because we can&rsquo;t use this construct in threads anyway, as it&rsquo;s <code>!Sync</code></li>
+<li>if we need interior mutability, we can just use <code>Cell</code> to fix our problem (`state: UnsafeCell =&gt; state: Cell::new(RefState))</li>
+</ul>
+<p>This is the fixed code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">use</span> std::cell::UnsafeCell;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">use</span> <span style="color:#66d9ef">crate</span>::cell::Cell;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[derive(Copy, Clone)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">enum</span> <span style="color:#a6e22e">RefState</span> {
+</span></span><span style="display:flex;"><span>    Unshared,
+</span></span><span style="display:flex;"><span>    Shared(<span style="color:#66d9ef">usize</span>),      <span style="color:#75715e">// immutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    Exclusive           <span style="color:#75715e">// mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">RefCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    value: <span style="color:#a6e22e">UnsafeCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>    state: <span style="color:#a6e22e">Cell</span><span style="color:#f92672">&lt;</span>RefState<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> RefCell<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(value: <span style="color:#a6e22e">T</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            value: <span style="color:#a6e22e">UnsafeCell</span>::new(value),
+</span></span><span style="display:flex;"><span>            state: <span style="color:#a6e22e">Cell</span>::new(RefState::Unshared),
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;&amp;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">match</span> self.state.get() {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have not given out any references, we can give a shared one
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Unshared <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state.set(RefState::Shared(<span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// SAFETY: there is only one reference that is immutable, there
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">//         is no exclusive (mutable) reference
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                Some(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.value.get() })
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// multiple shared references are ok as well
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Shared(n) <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state.set(RefState::Shared(n<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// SAFETY: there are only references that are immutable, there
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">//         is no exclusive (mutable) reference
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                Some(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.value.get() })
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there&#39;s already a mutable refernce given out, we can&#39;t give
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// another one out.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Exclusive <span style="color:#f92672">=&gt;</span> None,
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow_mut</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;&amp;</span><span style="color:#66d9ef">mut</span> T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> RefState::Unshared <span style="color:#f92672">=</span> self.state.get() {
+</span></span><span style="display:flex;"><span>            self.state.set(RefState::Exclusive);
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// SAFETY: no other references have been given
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">//         out or can be given out after this.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            Some(<span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.value.get() })
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have given out ANY reference, it&#39;s not ok to give out
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// a mutable reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>New Problem: We never decrement the reference count, we need to track how many references there are currently and decrement if necessary, or even drop an exclusive reference.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">use</span> std::cell::UnsafeCell;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">use</span> <span style="color:#66d9ef">crate</span>::cell::Cell;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#[derive(Copy, Clone)]</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">enum</span> <span style="color:#a6e22e">RefState</span> {
+</span></span><span style="display:flex;"><span>    Unshared,
+</span></span><span style="display:flex;"><span>    Shared(<span style="color:#66d9ef">usize</span>),      <span style="color:#75715e">// immutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    Exclusive           <span style="color:#75715e">// mutable
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">RefCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    value: <span style="color:#a6e22e">UnsafeCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>    state: <span style="color:#a6e22e">Cell</span><span style="color:#f92672">&lt;</span>RefState<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> RefCell<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(value: <span style="color:#a6e22e">T</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        Self {
+</span></span><span style="display:flex;"><span>            value: <span style="color:#a6e22e">UnsafeCell</span>::new(value),
+</span></span><span style="display:flex;"><span>            state: <span style="color:#a6e22e">Cell</span>::new(RefState::Unshared),
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;</span>Ref<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">match</span> self.state.get() {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have not given out any references, we can give a shared one
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Unshared <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state.set(RefState::Shared(<span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// SAFETY: there is only one reference that is immutable, there
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">//         is no exclusive (mutable) reference
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                Some(Ref { refcell: <span style="color:#a6e22e">self</span> })
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// multiple shared references are ok as well
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Shared(n) <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.state.set(RefState::Shared(n<span style="color:#f92672">+</span><span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>                <span style="color:#75715e">// SAFETY: there are only references that are immutable, there
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                <span style="color:#75715e">//         is no exclusive (mutable) reference
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>                Some(Ref { refcell: <span style="color:#a6e22e">self</span> })
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if there&#39;s already a mutable refernce given out, we can&#39;t give
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// another one out.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Exclusive <span style="color:#f92672">=&gt;</span> None,
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">borrow_mut</span>(<span style="color:#f92672">&amp;</span>self) -&gt; Option<span style="color:#f92672">&lt;</span>RefMut<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;&gt;</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#66d9ef">let</span> RefState::Unshared <span style="color:#f92672">=</span> self.state.get() {
+</span></span><span style="display:flex;"><span>            self.state.set(RefState::Exclusive);
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// SAFETY: no other references have been given
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">//         out or can be given out after this.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            Some(RefMut { refcell: <span style="color:#a6e22e">self</span> })
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// if we have given out ANY reference, it&#39;s not ok to give out
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// a mutable reference.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            None
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// we need this to be able to track the reference count
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Ref</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;refcell</span>, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    refcell: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;refcell</span> <span style="color:#a6e22e">RefCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// this implements reference counting
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Drop <span style="color:#66d9ef">for</span> Ref<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">drop</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">match</span> self.refcell.state.get() {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// can&#39;t be shared if exclusive, so this is impossible
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Exclusive <span style="color:#f92672">=&gt;</span> unreachable!(),
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// to drop we need a ref in the first place, so impossible
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Unshared <span style="color:#f92672">=&gt;</span> unreachable!(),
+</span></span><span style="display:flex;"><span>            RefState::Shared(<span style="color:#ae81ff">1</span>) <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.refcell.state.set(RefState::Unshared);
+</span></span><span style="display:flex;"><span>            },
+</span></span><span style="display:flex;"><span>            RefState::Shared(n) <span style="color:#f92672">=&gt;</span> {
+</span></span><span style="display:flex;"><span>                self.refcell.state.set(RefState::Shared(n<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>));
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// if the user borrows, he doesn&#39;t want this weird Ref&lt;&#39;_, T&gt; type, but the
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// Option with the type in it so he can actually do something with it.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// we can implement this behavior with the Deref trait. This is invoked when you
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// use the dot operator
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> std::ops::Deref <span style="color:#66d9ef">for</span> Ref<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Target</span> <span style="color:#f92672">=</span> T;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// given a reference to self, give my a reference to the Target type
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">// if you have a Ref of T, you can call any method that requires a Ref of T
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">// on it. It dereferences into it, that means RefCell is now a smart pointer
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">deref</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">Self</span>::Target {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// get the value inside the refcell
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">// SAFETY: a Ref is only created if no exclusive references have been
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         given out. Once it is given out, state is set to Shared, so
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         no exclusive references are given out. So dereferencing into
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         a shared reference is fine.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.refcell.value.get() }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">RefMut</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;refcell</span>, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    refcell: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;refcell</span> <span style="color:#a6e22e">RefCell</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Drop <span style="color:#66d9ef">for</span> RefMut<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">drop</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">match</span> self.refcell.state.get() {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// can&#39;t be shared if exclusive, so this is impossible
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Exclusive <span style="color:#f92672">=&gt;</span> self.refcell.state.set(RefState::Unshared),
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// to drop we need a ref in the first place, so impossible
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            RefState::Unshared <span style="color:#f92672">|</span> RefState::Shared(_) <span style="color:#f92672">=&gt;</span> unreachable!(),
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> std::ops::Deref <span style="color:#66d9ef">for</span> RefMut<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Target</span> <span style="color:#f92672">=</span> T;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">deref</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">Self</span>::Target {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// SAFETY: see SAFETY DerefMut 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.refcell.value.get() }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> std::ops::DerefMut <span style="color:#66d9ef">for</span> RefMut<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// SAFETY: A RefMut is only created, if no other references have been given
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">//         out. Once given out, state is set to Exclusive, so no future
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">//         references are given out. Lease on inner value is Exclusive.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">deref_mut</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">mut</span> Self::Target {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> <span style="color:#f92672">*</span>self.refcell.value.get() }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>With this code, it is not possible to get two mutable references to an inner value.</p>
+<hr>
+<p><code>Rc</code> - Reference Counted Pointer to something on the Heap</p>
+<p>From the Documentation:</p>
+<pre tabindex="0"><code>A single-threaded reference-counting pointer. ‘Rc’ stands for ‘Reference Counted’. The type Rc&lt;T&gt; provides shared ownership of a value of type T, allocated in the heap. Invoking clone on Rc produces a new pointer to the same allocation in the heap. When the last Rc pointer to a given allocation is destroyed, the value stored in that allocation (often referred to as “inner value”) is also dropped.
+
+Shared references in Rust disallow mutation by default, and Rc is no exception: you cannot generally obtain a mutable reference to something inside an Rc. If you need mutability, put a Cell or RefCell inside the Rc; see an example of mutability inside an Rc.*
+</code></pre><p>This means that if we need a mutable <code>Rc</code> we need to combine it with a <code>Cell</code> or a <code>RefCell</code>.</p>
+<ul>
+<li><code>Rc</code> never provides mutability, it only provides counted references</li>
+<li>it deallocates when the last reference goes away</li>
+<li><code>Rc</code> is <code>!Sync</code></li>
+</ul>
+<p>We have to fix the <code>drop</code>, see the comment in the code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#75715e">// we need to drop the box at some point
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Drop <span style="color:#66d9ef">for</span> Rc<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">drop</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> inner <span style="color:#f92672">=</span> <span style="color:#66d9ef">unsafe</span> { <span style="color:#f92672">&amp;*</span>self.inner };
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> c <span style="color:#f92672">=</span> inner.refcount.get();
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> c <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// SAFETY: we are the only reference and we should be dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            drop(inner);
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// we don&#39;t want to take a shared pointer and drop it, that&#39;s why
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// rust wants a *mut here, instead of *const.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">let</span> _ <span style="color:#f92672">=</span> Box::from_raw(self.inner); <span style="color:#75715e">// &lt;-- this will fail to compile
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// to get around this, is to use std::ptr::NonNull;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// this tells the compiler that a pointer cannot be NULL
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// there are other Rc&#39;s so don&#39;t drop the Box
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            inner.refcount.set(c<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The Fix: We use std::ptr::NonNull.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">use</span> <span style="color:#66d9ef">crate</span>::cell::Cell;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">use</span> std::ptr::NonNull;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">RcInner</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    value: <span style="color:#a6e22e">T</span>,
+</span></span><span style="display:flex;"><span>    refcount: <span style="color:#a6e22e">Cell</span><span style="color:#f92672">&lt;</span><span style="color:#66d9ef">usize</span><span style="color:#f92672">&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Rc</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    inner: <span style="color:#a6e22e">NonNull</span><span style="color:#f92672">&lt;</span>RcInner<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;&gt;</span>,
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// we can&#39;t keep the reference count here, because of the clone
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#75715e">// the reference count has to be in the value that is being cloned
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Rc<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">new</span>(v: <span style="color:#a6e22e">T</span>) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// allocate on the heap
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">let</span> inner <span style="color:#f92672">=</span> Box::new(
+</span></span><span style="display:flex;"><span>            RcInner { value: <span style="color:#a6e22e">v</span>, refcount: <span style="color:#a6e22e">Cell</span>::new(<span style="color:#ae81ff">1</span>) }
+</span></span><span style="display:flex;"><span>        );
+</span></span><span style="display:flex;"><span>        Rc {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// consume to box and give a raw pointer back
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// this will prevent the Box from being dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// SAFETY: Box does not give us a NULL pointer.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            inner: <span style="color:#a6e22e">unsafe</span> { NonNull::new_unchecked(Box::into_raw(inner)) }
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// if we did: inner: &amp;*inner the Box would be dropped here!
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// when we clone the Rc we increase the reference count, the inner value
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">// still points to the same location on the heap
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Clone <span style="color:#66d9ef">for</span> Rc<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">clone</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#a6e22e">Self</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// if we have an Rc, the compiler does not know if the *const RcInner&lt;T&gt;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">// pointer is still valid
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">let</span> inner <span style="color:#f92672">=</span> <span style="color:#66d9ef">unsafe</span> { self.inner.as_ref() };
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> c <span style="color:#f92672">=</span> inner.refcount.get();
+</span></span><span style="display:flex;"><span>        inner.refcount.set(c <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        Rc { inner: <span style="color:#a6e22e">self</span>.inner }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> std::ops::Deref <span style="color:#66d9ef">for</span> Rc<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">type</span> <span style="color:#a6e22e">Target</span> <span style="color:#f92672">=</span> T;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">deref</span>(<span style="color:#f92672">&amp;</span>self) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">Self</span>::Target {
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// SAFETY: self.inner is a box, that is only deallocated when the last
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         Rc goes away. We have an Rc, so the box has not been deallocated
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#75715e">//         so we can deref
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">unsafe</span> { self.inner.as_ref() }.value
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">// we need to drop the box at some point
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> Drop <span style="color:#66d9ef">for</span> Rc<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">drop</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> inner <span style="color:#f92672">=</span> <span style="color:#66d9ef">unsafe</span> { self.inner.as_ref() };
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">let</span> c <span style="color:#f92672">=</span> inner.refcount.get();
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> c <span style="color:#f92672">==</span> <span style="color:#ae81ff">1</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// SAFETY: we are the only reference and we should be dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">let</span> _ <span style="color:#f92672">=</span> drop(inner);
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// we don&#39;t want to take a shared pointer and drop it, that&#39;s why
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// rust wants a *mut here, instead of *const.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// let _ = Box::from_raw(self.inner); &lt;-- this will fail
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// to get around this, is to use std::ptr::NonNull;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#75715e">// this tells the compiler that a pointer cannot be NULL
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            <span style="color:#66d9ef">let</span> _ <span style="color:#f92672">=</span> <span style="color:#66d9ef">unsafe</span> { Box::from_raw(self.inner.as_ptr()) };
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>            <span style="color:#75715e">// there are other Rc&#39;s so don&#39;t drop the Box
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>            inner.refcount.set(c<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Now, the last thing we need to do, which is hard to understand: <code>PhantomData</code></p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Rc</span><span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>	inner: <span style="color:#a6e22e">NonNull</span><span style="color:#f92672">&lt;</span>RcInner<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;&gt;</span>,
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// we can&#39;t keep the reference count here, because of the clone
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// the reference count has to be in the value that is being cloned
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	_marker: <span style="color:#a6e22e">PhantomData</span><span style="color:#f92672">&lt;</span>RcInner<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;&gt;</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>without the <code>_marker</code> Rust does not know that the type <code>Rc</code> actually owns the <code>T</code>, it&rsquo;s not aware that it&rsquo;s dropped. This is important for types that have a lifetime.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> <span style="color:#a6e22e">Foo</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span>, T: Default<span style="color:#f92672">&gt;</span> { v: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#a6e22e">mut</span> T }
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">impl</span><span style="color:#f92672">&lt;</span>T: Default<span style="color:#f92672">&gt;</span> Drop <span style="color:#66d9ef">for</span> Foo<span style="color:#f92672">&lt;</span>&#39;_, T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">drop</span>(<span style="color:#f92672">&amp;</span><span style="color:#66d9ef">mut</span> self) {
+</span></span><span style="display:flex;"><span>		std::mem::replace(self.v, T::default());
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>} 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">main</span>() {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">let</span> t <span style="color:#f92672">=</span> String::from(<span style="color:#e6db74">&#34;hello&#34;</span>);
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// mutable pointer to the string
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">let</span> foo <span style="color:#f92672">=</span> Foo { v: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">mut</span> t };
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// string is dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	drop(t);
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// foo is dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	drop(foo);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// the drop is actually implicit, in reality it looks like this:
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#66d9ef">let</span> (foo, t);
+</span></span><span style="display:flex;"><span>	t <span style="color:#f92672">=</span> String::from(<span style="color:#e6db74">&#34;hello&#34;</span>);
+</span></span><span style="display:flex;"><span>	foo <span style="color:#f92672">=</span> Foo { v: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">mut</span> t };
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// implicit drop
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// the drop of foo will use all of the fields of Foo, which also means the String will be used
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// when Foo is dropped, it will access v, but v has already been dropped
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// the order in which drops happen matters.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// we need PhantomData in Rc so dropping Rc will also drop the inner value, in this case Foo.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// PhantomData treat the type Rc as if something is in it, even though it&#39;s just a pointer.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// this means that if we wrap Foo in an Rc, the compiler knows that Foo needs to be dropped by
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// telling it that Rc owns the Foo
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>More about Drop Checks can be found here: <a href="https://doc.rust-lang.org/nomicon/dropck.html">https://doc.rust-lang.org/nomicon/dropck.html</a></p>
+<p>Note: Rc opts out of being Sized by <code>T: ?Sized</code> - this is not talked about in this stream, too complicated.</p>
+<hr>
+<p>Thread-Safety</p>
+<p>The types up until now are not thread-safe, but there is a thread-safe version for <code>Rc</code>, this is <code>Arc</code>.
+The difference is that instead of using a Cell, like we did inside <code>Rc</code> we <em>could</em> use an atomic counter. But, this comes with problems, it is actually solved with <code>RwLock</code>. A reader-writer lock is a Cell were counters are kept via atomics AND <code>borrow</code> and <code>borrow_mut</code> always return a value. However, if it is not possible to actually return the value, they block the respective thread.</p>
+<p>Example: if you call <code>borrow</code> and a different thread has an exclusive reference, the calling thread will be blocked until the exclusive reference is given up. At that point, the caller thread will resume.</p>
+<hr>
+<p>The <code>std::borrow</code> module contains <code>Cow</code> Copy-on-Write, which is an Enum.
+A Cow either contains a reference to something, or the type itself (for example reference to String or a String). Cow stands for <code>clone-on-write</code>.</p>
+<p>Cow implements <code>Deref</code> - you can get a shared reference to the thing inside Cow.
+If you want to modify the value inside, if it&rsquo;s a reference, it can&rsquo;t be modified, because it&rsquo;s a shared reference. That means if the value inside is currently borrowed and you want write access to it, Cow will clone it for you. Thus, you now have a value that you can write, a copy, inside Cow the value is now owned.</p>
+<p>Cow is used when you mostly need to read, but sometimes, you also want to write. This is useful with strings.</p>
+<p>Example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">escape</span>(s: <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span>) -&gt; <span style="color:#66d9ef">&amp;</span><span style="color:#66d9ef">str</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#75715e">// escapes special characters by cloning the input string
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// &#39; =&gt; \&#39;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// &#34; =&gt; \&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// but when you have a string with no special characters like &#34;foo&#34; there&#39;s no need to clone
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// because we didn&#39;t modify it.
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>	<span style="color:#75715e">// to solve this, return a Cow!
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">escape</span>(s: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">&#39;a</span> <span style="color:#66d9ef">str</span>) -&gt; <span style="color:#a6e22e">Cow</span><span style="color:#f92672">&lt;</span><span style="color:#a6e22e">&#39;a</span>, <span style="color:#66d9ef">str</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">if</span> already_escaped(s) {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// the &#34;foo&#34; case
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		Cow::Borrow(s)
+</span></span><span style="display:flex;"><span>	} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// if we encounter special characters, we need to modify
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		<span style="color:#66d9ef">let</span> <span style="color:#66d9ef">mut</span> string <span style="color:#f92672">=</span> s.to_string();
+</span></span><span style="display:flex;"><span>		<span style="color:#75715e">// ... modify string here ...
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>		Cow::Owned(string)
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Another Example (warning: this is pretty much pseudocode, but gets across the point):</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">impl</span> String {
+</span></span><span style="display:flex;"><span>	<span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">from_utf8_lossy</span>(bytes: <span style="color:#66d9ef">&amp;</span>[<span style="color:#66d9ef">u8</span>]) -&gt; <span style="color:#a6e22e">Cow</span><span style="color:#f92672">&lt;</span>&#39;_, <span style="color:#66d9ef">str</span><span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>		<span style="color:#66d9ef">if</span> valid_utf8(bytes) {
+</span></span><span style="display:flex;"><span>			Cow::Borrowed(bytes <span style="color:#66d9ef">as</span> <span style="color:#f92672">&amp;</span><span style="color:#66d9ef">str</span>)
+</span></span><span style="display:flex;"><span>		} <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>			<span style="color:#75715e">// walk the string, remove invalid utf8
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>			<span style="color:#66d9ef">let</span> <span style="color:#66d9ef">mut</span> bts <span style="color:#f92672">=</span> Vec::from(bytes);
+</span></span><span style="display:flex;"><span>			<span style="color:#66d9ef">for</span> bi <span style="color:#66d9ef">in</span> bts {
+</span></span><span style="display:flex;"><span>				<span style="color:#75715e">// replace with INVALID_CHARACTER utf-8 symbol if not valid utf-8
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>				Cow::Owned(bts <span style="color:#66d9ef">as</span> String)
+</span></span><span style="display:flex;"><span>			}
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>	}
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div>
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

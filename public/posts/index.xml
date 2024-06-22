@@ -2,54 +2,46 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Posts on 0xca7</title>
-    <link>https://0xca7.github.io/posts/</link>
+    <link>http://localhost:1313/posts/</link>
     <description>Recent content in Posts on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 06 Jan 2023 18:17:14 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 22 Jun 2024 10:58:55 +0200</lastBuildDate>
+    <atom:link href="http://localhost:1313/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Rust Reversing - Iterators</title>
+      <link>http://localhost:1313/posts/rustre1/</link>
+      <pubDate>Sat, 22 Jun 2024 10:58:55 +0200</pubDate>
+      <guid>http://localhost:1313/posts/rustre1/</guid>
+      <description>Prerequisites I&amp;rsquo;ll use Ghidra 11.0.2 for reversing, all binaries are built on Linux x86_64. Doesn&amp;rsquo;t matter which disassembler you use, Binja, IDA, Ghidra, neither does the OS Windows, Linux or Mac, doesn&amp;rsquo;t matter either. So, if you want to follow along, feel free to use any setup you want. It helps to know a bare minimum about Rust. If you don&amp;rsquo;t, at least you should know C :)&#xA;For cargo and rustc, I have the following versions:</description>
+    </item>
     <item>
       <title>Reversing AARCH64 C&#43;&#43; Binaries</title>
-      <link>https://0xca7.github.io/posts/aarch64_cpp/</link>
+      <link>http://localhost:1313/posts/aarch64_cpp/</link>
       <pubDate>Fri, 06 Jan 2023 18:17:14 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/aarch64_cpp/</guid>
-      <description>In the files below you can find my notes regarding reversing C++ binaries compiled for AARCH64 / ARM64. The compiler used for all of these is g++, the stripping of one of the binaries was achieved via the strip command. No options were given to g++ when compiling on an aarch64 Debian 11 system. Enjoy.
-00 - Basic Classes
-01 - Pure Virtual Methods I
-02 - Abstract Class
-03 - Template</description>
+      <guid>http://localhost:1313/posts/aarch64_cpp/</guid>
+      <description>In the files below you can find my notes regarding reversing C++ binaries compiled for AARCH64 / ARM64. The compiler used for all of these is g++, the stripping of one of the binaries was achieved via the strip command. No options were given to g++ when compiling on an aarch64 Debian 11 system. Enjoy.&#xA;00 - Basic Classes&#xA;01 - Pure Virtual Methods I&#xA;02 - Abstract Class&#xA;03 - Template</description>
     </item>
-    
     <item>
       <title>The Art of Malware Analysis - Course Review</title>
-      <link>https://0xca7.github.io/posts/aoma/</link>
+      <link>http://localhost:1313/posts/aoma/</link>
       <pubDate>Mon, 12 Sep 2022 10:12:29 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/aoma/</guid>
-      <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).
-Time to do my part and review the course. I like small reviews, so I will keep it at that.
-Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.
-Key Points  very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction  Details The course starts with a general introduction to malware and the analysis of malware.</description>
+      <guid>http://localhost:1313/posts/aoma/</guid>
+      <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).&#xA;Time to do my part and review the course. I like small reviews, so I will keep it at that.&#xA;Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.&#xA;Key Points very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction Details The course starts with a general introduction to malware and the analysis of malware.</description>
     </item>
-    
     <item>
       <title>Ghidrathon &#43; Unicorn Engine &#43; Capstone</title>
-      <link>https://0xca7.github.io/posts/ghidrathon_unicorn/</link>
+      <link>http://localhost:1313/posts/ghidrathon_unicorn/</link>
       <pubDate>Sun, 28 Aug 2022 19:32:42 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/ghidrathon_unicorn/</guid>
-      <description>Ghidra with Ghidrathon + Unicorn Engine The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&amp;rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.
-My Script I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3].</description>
+      <guid>http://localhost:1313/posts/ghidrathon_unicorn/</guid>
+      <description>Ghidra with Ghidrathon + Unicorn Engine The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&amp;rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.&#xA;My Script I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3].</description>
     </item>
-    
     <item>
       <title>ARM Cortex-M3 libopencm3 Project</title>
-      <link>https://0xca7.github.io/posts/libopencm3_project/</link>
+      <link>http://localhost:1313/posts/libopencm3_project/</link>
       <pubDate>Fri, 29 Jul 2022 20:36:47 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/libopencm3_project/</guid>
+      <guid>http://localhost:1313/posts/libopencm3_project/</guid>
       <description>Introduction A while ago I ordered a STM32 Blue Pill board. This normally features a STM32F103C8T6 microcontroller, however, mine has a STM32F103C6T6 on it. I decided to program it using libopencm3 (http://libopencm3.org/). As the STMF103C6T6 does not feature a floating point unit (FPU), I thought I&amp;rsquo;d play with fixed point numbers a little. In this post, I will document the simple fixed-point arithmetic I implemented and show how to use</description>
     </item>
-    
   </channel>
 </rss>

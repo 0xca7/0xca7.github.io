@@ -2,87 +2,98 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://0xca7.github.io/</loc>
-    <lastmod>2024-01-01T10:00:43+01:00</lastmod>
-    <priority>0</priority>
+    <loc>http://localhost:1313/</loc>
+    <lastmod>2024-06-22T10:58:55+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/ca7vsapt/</loc>
+    <loc>http://localhost:1313/posts/</loc>
+    <lastmod>2024-06-22T10:58:55+02:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/rustre1/</loc>
+    <lastmod>2024-06-22T10:58:55+02:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/mw/latrodectus/</loc>
+    <lastmod>2024-05-11T13:45:19+02:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/mw/</loc>
+    <lastmod>2024-05-11T13:45:19+02:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/mw/wineloader/</loc>
+    <lastmod>2024-03-16T10:27:33+00:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/notes/crust_of_rust/</loc>
+    <lastmod>2024-01-13T13:26:53+01:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/notes/</loc>
+    <lastmod>2024-01-13T13:26:53+01:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/mw/ca7vsapt/</loc>
     <lastmod>2024-01-01T10:00:43+01:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/</loc>
-    <lastmod>2024-01-01T10:00:43+01:00</lastmod>
-  </url><url>
-    <loc>https://0xca7.github.io/mw/pebwalk_notes/</loc>
+    <loc>http://localhost:1313/mw/pebwalk_notes/</loc>
     <lastmod>2023-10-17T19:11:03+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/public/</loc>
+    <loc>http://localhost:1313/public/</loc>
     <lastmod>2023-10-01T10:26:15+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/public/posts/decrypting_firmware/</loc>
+    <loc>http://localhost:1313/public/posts/decrypting_firmware/</loc>
     <lastmod>2023-10-01T10:26:15+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/extract_cramfs/</loc>
+    <loc>http://localhost:1313/notes/extract_cramfs/</loc>
     <lastmod>2023-02-25T20:56:49+01:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/</loc>
-    <lastmod>2023-02-25T20:56:49+01:00</lastmod>
-  </url><url>
-    <loc>https://0xca7.github.io/notes/mount_ubifs/</loc>
+    <loc>http://localhost:1313/notes/mount_ubifs/</loc>
     <lastmod>2023-02-25T20:51:56+01:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/posts/</loc>
+    <loc>http://localhost:1313/posts/aarch64_cpp/</loc>
     <lastmod>2023-01-06T18:17:14+01:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/posts/aarch64_cpp/</loc>
-    <lastmod>2023-01-06T18:17:14+01:00</lastmod>
-  </url><url>
-    <loc>https://0xca7.github.io/notes/docker_emulation/</loc>
+    <loc>http://localhost:1313/notes/docker_emulation/</loc>
     <lastmod>2022-11-14T19:24:18+01:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/pq_lattice/</loc>
+    <loc>http://localhost:1313/notes/pq_lattice/</loc>
     <lastmod>2022-09-14T19:42:07+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/posts/aoma/</loc>
+    <loc>http://localhost:1313/posts/aoma/</loc>
     <lastmod>2022-09-12T10:12:29+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/stop_djvu/</loc>
+    <loc>http://localhost:1313/mw/stop_djvu/</loc>
     <lastmod>2022-09-03T09:52:46+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/linux_botnet/</loc>
+    <loc>http://localhost:1313/mw/linux_botnet/</loc>
     <lastmod>2022-09-03T09:52:40+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/golang_stealer/</loc>
+    <loc>http://localhost:1313/mw/golang_stealer/</loc>
     <lastmod>2022-09-03T09:52:34+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/redline/</loc>
+    <loc>http://localhost:1313/mw/redline/</loc>
     <lastmod>2022-09-03T09:52:29+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/blackguard/</loc>
+    <loc>http://localhost:1313/mw/blackguard/</loc>
     <lastmod>2022-09-03T09:52:24+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/virt-manager-arm/</loc>
+    <loc>http://localhost:1313/notes/virt-manager-arm/</loc>
     <lastmod>2022-09-01T18:45:47+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/mount_jffs2/</loc>
+    <loc>http://localhost:1313/notes/mount_jffs2/</loc>
     <lastmod>2022-08-31T19:09:03+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/docker/</loc>
+    <loc>http://localhost:1313/notes/docker/</loc>
     <lastmod>2022-08-31T16:32:04+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/posts/ghidrathon_unicorn/</loc>
+    <loc>http://localhost:1313/posts/ghidrathon_unicorn/</loc>
     <lastmod>2022-08-28T19:32:42+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/notes/calling_conventions/</loc>
+    <loc>http://localhost:1313/notes/calling_conventions/</loc>
     <lastmod>2022-08-26T20:56:15+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/mw/malware_analysis/</loc>
+    <loc>http://localhost:1313/mw/malware_analysis/</loc>
     <lastmod>2022-08-26T15:46:59+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/posts/libopencm3_project/</loc>
+    <loc>http://localhost:1313/posts/libopencm3_project/</loc>
     <lastmod>2022-07-29T20:36:47+02:00</lastmod>
   </url><url>
-    <loc>https://0xca7.github.io/categories/</loc>
+    <loc>http://localhost:1313/categories/</loc>
   </url><url>
-    <loc>https://0xca7.github.io/tags/</loc>
+    <loc>http://localhost:1313/tags/</loc>
   </url>
 </urlset>

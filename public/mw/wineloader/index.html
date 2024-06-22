@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wineloader | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Wineloader</span></h1>
+
+<h2 class="date">2024/03/16</h2>
+</div>
+
+<main>
+<p>SHA256: <code>72b92683052e0c813890caf7b4f8bfd331a8b2afc324dd545d46138f677178c4</code></p>
+<p>Resources:
+[1] <a href="https://www.zscaler.com/blogs/security-research/european-diplomats-targeted-spikedwine-wineloader">https://www.zscaler.com/blogs/security-research/european-diplomats-targeted-spikedwine-wineloader</a></p>
+<h1 id="summary">Summary</h1>
+<p>The article in the resources above contains all the important information about the sample.</p>
+<p>Goals:</p>
+<ul>
+<li>
+<p>find the C2 URL, just to have fun.</p>
+</li>
+<li>
+<p>These analysis notes add to the zscaler report [1] by showing how to reach a subset of the presented conclusions and supply code snippets to help with analysis. Specifically, the means to statically decrypt the main payload of the sample are given, as well as a means for decrypting strings and the C2 URL used by the malware.</p>
+</li>
+<li>
+<p>This writeup supplies code and deeper explanations which might be useful for beginners, but not relevant for reporting.</p>
+</li>
+</ul>
+<h1 id="static-analysis">Static Analysis</h1>
+<p>All static analysis was done using IDA Free 8.3 and Binary Ninja 4.0. The entropy graph shows that a large area of the executable seems to be encrypted or at least compressed. In this case, it is RC4 encryption.</p>
+<p><img src="/static/819048f2-9864-4011-a792-259cde85d580.png" alt="image.png"></p>
+<p>As stated in [1], the exported function which is used as an entrypoint by the calling executable is <code>_set_se_translator</code>. The assembly code is shown below.</p>
+<p><img src="/static/feb9ab8a-88e0-4ed6-962a-9913fee7e68d.png" alt="image.png"></p>
+<p>The lines which are interesting here are:</p>
+<pre tabindex="0"><code>lea     rcx, word_18000649E
+mov     rdx, 8028h
+</code></pre><p>The address denoted as <code>word_18000649E</code> is the start of the encrypted main module, which a length of <code>0x8028</code> bytes.
+Both of these values are parameters for the call to <code>sub_1800061CE</code>, which in turn calls <code>sub_180005B3E</code>. Inside of <code>sub_180005B3E</code> is the RC4 initialization:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>  v7 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> ( (v7 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> )
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_RC4_state <span style="color:#f92672">+</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i) <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>i;  <span style="color:#75715e">// &lt;-- [M0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    a4 <span style="color:#f92672">*=</span> <span style="color:#ae81ff">0x6FC9A775</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i <span style="color:#f92672">==</span> <span style="color:#ae81ff">255</span> )
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      v7 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>      a4 <span style="color:#f92672">*=</span> <span style="color:#ae81ff">0x3A6A1BD5</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">++*</span>i; <span style="color:#75715e">// &lt;-- [M1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  }
+</span></span></code></pre></div><p>There are some unnecessary parts in this loop, which is probably for &ldquo;obfuscation&rdquo; purposes. In essence, all this does is:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">256</span>; i<span style="color:#f92672">++</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    state[i] <span style="color:#f92672">=</span> i; <span style="color:#75715e">// M0, M1
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>}
+</span></span></code></pre></div><p>The next part of the function <code>sub_180005B3E</code> is this (I already renamed to key to <code>g_KEY</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>  <span style="color:#66d9ef">for</span> ( <span style="color:#f92672">*</span>i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; ; <span style="color:#f92672">++*</span>i )
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    result <span style="color:#f92672">=</span> v8 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( (v8 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span> )
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>j <span style="color:#f92672">+=</span> <span style="color:#f92672">*</span>((_BYTE <span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_KEY <span style="color:#f92672">+</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i <span style="color:#f92672">%</span> <span style="color:#ae81ff">256</span>) <span style="color:#f92672">+</span> <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_RC4_state <span style="color:#f92672">+</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i); <span style="color:#75715e">// &lt;-- [M0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    ((<span style="color:#66d9ef">void</span> (<span style="color:#66d9ef">__fastcall</span> <span style="color:#f92672">*</span>)(<span style="color:#66d9ef">__int64</span>, <span style="color:#66d9ef">__int64</span>, <span style="color:#66d9ef">__int64</span>, <span style="color:#66d9ef">__int64</span>, <span style="color:#66d9ef">int</span>))loc_1800059FE)( <span style="color:#75715e">// &lt;-- [M1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i <span style="color:#f92672">+</span> a_RC4_state,
+</span></span><span style="display:flex;"><span>      (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>j <span style="color:#f92672">+</span> a_RC4_state,
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">0x3B908B94</span>i64,
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">0xFA51</span>i64,
+</span></span><span style="display:flex;"><span>      <span style="color:#ae81ff">0x3CD5</span>);
+</span></span><span style="display:flex;"><span>    v6 <span style="color:#f92672">=</span> (v6 <span style="color:#f92672">%</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1543287202</span>) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0x5CCA8034</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)<span style="color:#f92672">*</span>i <span style="color:#f92672">==</span> <span style="color:#ae81ff">255</span> )
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      v8 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>      v5 <span style="color:#f92672">*=</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">1177247145</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span></code></pre></div><p>Again, there is some &ldquo;obfuscation&rdquo; in here, but in essence, this happens:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>j <span style="color:#f92672">=</span> j <span style="color:#f92672">+</span> state[i] <span style="color:#f92672">+</span> key[i mod keylength] mod <span style="color:#ae81ff">256</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">swap</span>(state[i], state[j])
+</span></span></code></pre></div><p>The first line of the above code corresponds to <code>M[0]</code>. The call at <code>M[1]</code> is a little trickier. Here, IDA makes a mistake, the get the decompiler to display this correctly, do the following:</p>
+<ol>
+<li>follow <code>loc_1800059FE</code> in the assembly view.</li>
+</ol>
+<pre tabindex="0"><code>.text:00000001800059FE loc_1800059FE:                          ; CODE XREF: sub_180005B3E+19C↓p // &lt;-- YOU ARE HERE.
+.text:00000001800059FE                                         ; sub_180005DDE+AA↓p
+.text:00000001800059FE                 sub     rsp, 28h
+.text:0000000180005A02                 mov     ax, [rsp+50h]
+.text:0000000180005A07
+.text:0000000180005A07 loc_180005A07:                          ; DATA XREF: .pdata:00000001800172B8↓o
+.text:0000000180005A07                 mov     [rsp+26h], r9w
+.text:0000000180005A07 ; ---------------------------------------------------------------------------
+.text:0000000180005A0D                 db 44h, 89h, 44h  // &lt;-- [M0]
+</code></pre><ol start="2">
+<li>put the cursor at <code>M[0]</code> as shown in the assembly snippet above and press <code>c</code> to create code here</li>
+<li>put the cursor at <code>loc_1800059FE</code> and create a function by pressing <code>p</code></li>
+<li>go back to the decompiler view, function <code>sub_180005B3E</code> and press <code>F5</code></li>
+</ol>
+<p>You now have a function call to <code>sub_1800059FE</code> instead of a call to <code>((void (__fastcall *)(__int64, __int64, __int64, __int64, int))loc_1800059FE)(...</code>, which if followed, is just a simple swap function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">__int64</span> <span style="color:#66d9ef">__fastcall</span> <span style="color:#a6e22e">sub_1800059FE</span>(<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>a1, <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>a2)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> v3; <span style="color:#75715e">// [rsp+Fh] [rbp-19h]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>  v3 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>a1;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>a1 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>a2;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>a2 <span style="color:#f92672">=</span> v3;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>i64;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Thus, the function <code>sub_1800059FE</code> corresponds to <code>https://en.wikipedia.org/wiki/RC4#Key-scheduling_algorithm_(KSA)</code>. We also know where the key is located.</p>
+<p>With this, we everything necessary for decryption:</p>
+<ol>
+<li>we know RC4 is the algorithm</li>
+<li>we have the data and data length which is to be decrypted</li>
+<li>we have the key</li>
+</ol>
+<p>The following Python3 code will read the sample, decrypt the encrypted range of bytes and save the result to a new file <code>decrypted.bin</code> which can be used for further analysis.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#f92672">from</span> Crypto.Cipher <span style="color:#f92672">import</span> ARC4
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>FILE <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;72b92683052e0c813890caf7b4f8bfd331a8b2afc324dd545d46138f677178c4.exe&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># this is the raw file offset to the encryption key</span>
+</span></span><span style="display:flex;"><span>KEY_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x4a9e</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># the encryption key length in bytes</span>
+</span></span><span style="display:flex;"><span>KEYBYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">256</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># the raw file offset to the encrypted payload</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x589e</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># the number of bytes to decrypt</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_BYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x8028</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># read the original sample</span>
+</span></span><span style="display:flex;"><span>filebytes <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(FILE, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>    filebytes <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># extract key and ciphertext</span>
+</span></span><span style="display:flex;"><span>key <span style="color:#f92672">=</span> filebytes[KEY_OFFSET:KEY_OFFSET<span style="color:#f92672">+</span>KEYBYTES]
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[ENCRYPTED_OFFSET:ENCRYPTED_OFFSET<span style="color:#f92672">+</span>ENCRYPTED_BYTES]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># perform decryption</span>
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;decrypted len: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(len(decrypted)))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># replace the encrypted bytes of the file with the decrypted result</span>
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">=</span> filebytes[:ENCRYPTED_OFFSET];
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">+=</span> decrypted
+</span></span><span style="display:flex;"><span>file <span style="color:#f92672">+=</span> filebytes[ENCRYPTED_OFFSET<span style="color:#f92672">+</span>ENCRYPTED_BYTES:]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># write everything to a new file for analyis</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(<span style="color:#e6db74">&#34;decrypted.bin&#34;</span>, <span style="color:#e6db74">&#34;wb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>    fp<span style="color:#f92672">.</span>write(file)
+</span></span></code></pre></div><pre><code>decrypted len: 32808
+</code></pre>
+<p>The raw file offsets can be extracted from as shown below:</p>
+<p><img src="/static/d7855854-bc3f-4737-87b9-bd1ddee759a7.png" alt="image.png"></p>
+<p>The cursor must be set to the location to determine the offset of, IDA will always show the raw file offset.</p>
+<p>Having decrypted the payload, further analysis is possible in the decrypted sample.</p>
+<p>Going back to the first screenshot of these analysis notes, the function <code>sub_18000CF2A</code> contains the decrypted main routine.</p>
+<p>In this function, there are several calls to <code>sub_180007096</code> (called 214 times in total in the sample). The parameter to the call are always byte arrays, either passed on the stack or stored in a global variable.</p>
+<pre tabindex="0"><code>.text:000000018000CF58                 mov     qword ptr [rdi-8], 0Ch
+.text:000000018000CF60                 mov     rax, 6FBA78ED00F7D404h
+.text:000000018000CF6A                 mov     [rdi], rax
+.text:000000018000CF6D                 mov     dword ptr [rdi+8], 0FCF1BF11h
+.text:000000018000CF74                 mov     r14d, 1
+.text:000000018000CF7A                 mov     [rdi+0Ch], r14
+.text:000000018000CF7E                 mov     edx, 0Ch
+.text:000000018000CF83                 mov     rcx, rdi
+.text:000000018000CF86                 call    sub_180007096  // &lt;-- M[0] encrypted string on the stack
+
+
+.text:000000018000CF8B                 xor     ebp, ebp
+.text:000000018000CF8D                 mov     [rdi+0Ch], ebp
+.text:000000018000CF90                 lea     rbx, [rsp+198h+v_data]
+.text:000000018000CF95                 mov     qword ptr [rbx-8], 1Ah
+.text:000000018000CF9D
+.text:000000018000CF9D loc_18000CF9D:                          ; DATA XREF: .pdata:000000018001778C↓o
+.text:000000018000CF9D                 movups  xmm6, cs:g_ENCRYPTED // &lt;-- M[1] encrypted string is a global
+.text:000000018000CFA4
+.text:000000018000CFA4 loc_18000CFA4:                          ; DATA XREF: .pdata:0000000180017798↓o
+.text:000000018000CFA4                 movups  xmmword ptr [rbx], xmm6
+.text:000000018000CFA7                 movups  xmm7, cs:g_ENCRYPTED+0Ah
+.text:000000018000CFAE                 movups  xmmword ptr [rbx+0Ah], xmm7
+.text:000000018000CFB2                 mov     [rbx+1Ch], r14
+.text:000000018000CFB6                 mov     edx, 1Ah
+.text:000000018000CFBB                 mov     rcx, rbx
+.text:000000018000CFBE                 call    sub_180007096
+</code></pre><p>Upon closer examination, the function <code>sub_180007096</code> is RC4 again, with the first argument being an encrypted string and the second argument being the string length.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">__int64</span> <span style="color:#66d9ef">__fastcall</span> <span style="color:#a6e22e">sub_180007096</span>(<span style="color:#66d9ef">__int64</span> a1, <span style="color:#66d9ef">__int64</span> a2)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> v4; <span style="color:#75715e">// [rsp+2Eh] [rbp-12Ah] BYREF
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v5; <span style="color:#75715e">// [rsp+2Fh] [rbp-129h] BYREF
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v_rc4_state; <span style="color:#75715e">// [rsp+30h] [rbp-128h] BYREF
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> v7; <span style="color:#75715e">// [rsp+31h] [rbp-127h]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">uc_memset</span>(<span style="color:#f92672">&amp;</span>v_rc4_state, <span style="color:#ae81ff">0</span>i64, <span style="color:#ae81ff">256</span>i64);
+</span></span><span style="display:flex;"><span>  v5 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  v4 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">uc_RC4_init_dec</span>(<span style="color:#f92672">&amp;</span>v5, <span style="color:#f92672">&amp;</span>v4, <span style="color:#f92672">&amp;</span>v_rc4_state);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> ( <span style="color:#f92672">!</span>a2 )
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">JUMPOUT</span>(<span style="color:#ae81ff">0x180007124</span>i64);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#a6e22e">uc_RC4_decrypt_0</span>(v7, <span style="color:#ae81ff">1</span>i64, v7, v7);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The function renamed to <code>uc_RC4_init_dec</code> (<code>sub_18000D847</code>) is again the initialization of RC4 using the same key that was used to decrypt the main module:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">__int64</span> <span style="color:#66d9ef">__fastcall</span> <span style="color:#a6e22e">sub_18000D847</span>(<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> <span style="color:#f92672">*</span>ai, <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> <span style="color:#f92672">*</span>aj, <span style="color:#66d9ef">__int64</span> a_rc4state)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> v3; <span style="color:#75715e">// al
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> v4; <span style="color:#75715e">// r10
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int64</span> result; <span style="color:#75715e">// rax
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> v6; <span style="color:#75715e">// r11
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span> v7; <span style="color:#75715e">// bl
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int64</span> v8; <span style="color:#75715e">// r11
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int64</span> v9; <span style="color:#75715e">// rsi
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">char</span> v10; <span style="color:#75715e">// bl
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>ai <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  v3 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  v4 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">do</span>
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v4) <span style="color:#f92672">=</span> v4;
+</span></span><span style="display:flex;"><span>    v4 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>ai <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( <span style="color:#f92672">*</span>ai <span style="color:#f92672">==</span> <span style="color:#ae81ff">0xFF</span> )
+</span></span><span style="display:flex;"><span>      v3 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>ai <span style="color:#f92672">=</span> v4;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> ( (v3 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> );
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">LOBYTE</span>(result) <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>aj <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>ai <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  v6 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">do</span>
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    v7 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>((_BYTE <span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>g_KEY <span style="color:#f92672">+</span> v6) <span style="color:#f92672">+</span> <span style="color:#f92672">*</span>aj <span style="color:#f92672">+</span> <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v6);
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>aj <span style="color:#f92672">=</span> v7;
+</span></span><span style="display:flex;"><span>    v8 <span style="color:#f92672">=</span> v7;
+</span></span><span style="display:flex;"><span>    v9 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>ai;
+</span></span><span style="display:flex;"><span>    v10 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v9);
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v9) <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v8);
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(_BYTE <span style="color:#f92672">*</span>)(a_rc4state <span style="color:#f92672">+</span> v8) <span style="color:#f92672">=</span> v10;
+</span></span><span style="display:flex;"><span>    v6 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>ai <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    result <span style="color:#f92672">=</span> (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int8</span>)result;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( <span style="color:#f92672">*</span>ai <span style="color:#f92672">==</span> <span style="color:#ae81ff">0xFF</span> )
+</span></span><span style="display:flex;"><span>      result <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>i64;
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>ai <span style="color:#f92672">=</span> v6;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> ( (result <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> );
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> result;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Thus, RC4 is used for string decryption, always with the same key for the main module. As stated above, there are two cases of how the call to the RC4 decryption function is made:</p>
+<ol>
+<li>the parameters to the call, the encrypted string and it&rsquo;s length, are stored in a global variable</li>
+<li>the parameters are passed via buffer on the stack.</li>
+</ol>
+<p>This allows us to write Python3 code, which will handle the decryption by using either file offsets for global locations or the values assembled in stack buffers.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">decrypt wineloader payload
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> Crypto.Cipher <span style="color:#f92672">import</span> ARC4
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> struct
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>FILE <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;code/decrypted.bin&#34;</span>
+</span></span><span style="display:flex;"><span>KEY_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x58be</span>
+</span></span><span style="display:flex;"><span>KEYBYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">256</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x6296</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_BYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1a</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>filebytes <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(FILE, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>    filebytes <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># this can be done in case of a global variable</span>
+</span></span><span style="display:flex;"><span>key <span style="color:#f92672">=</span> filebytes[KEY_OFFSET:KEY_OFFSET<span style="color:#f92672">+</span>KEYBYTES]
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[ENCRYPTED_OFFSET:ENCRYPTED_OFFSET<span style="color:#f92672">+</span>ENCRYPTED_BYTES]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># here, we decrypt the library name</span>
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;decrypted offset </span><span style="color:#e6db74">{:x}</span><span style="color:#e6db74">: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(ENCRYPTED_OFFSET, s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># this is the function that is being loaded from the lib</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x6FBA78ED00F7D404</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;I&#39;</span>, <span style="color:#ae81ff">0xFCF1BF11</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;decrypted: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span></code></pre></div><pre><code>decrypted offset 6296: kernel32.dll
+decrypted: FreeConsole*`
+</code></pre>
+<p>In order to find the C2 URL, I just skimmed the file and selectively decrypted strings. By decrypting the string <code>kernel32.dll</code> right at the beginning and checking where it is used, I found this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> _LIST_ENTRY <span style="color:#f92672">*</span><span style="color:#66d9ef">__fastcall</span> <span style="color:#a6e22e">sub_180007260</span>(<span style="color:#66d9ef">__int64</span> a1)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">struct</span> _PEB_LDR_DATA <span style="color:#f92672">*</span>Ldr; <span style="color:#75715e">// r8
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">struct</span> _LIST_ENTRY <span style="color:#f92672">*</span>Flink; <span style="color:#75715e">// rdx
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">struct</span> _LIST_ENTRY <span style="color:#f92672">*</span>p_InMemoryOrderModuleList; <span style="color:#75715e">// r8
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">struct</span> _LIST_ENTRY <span style="color:#f92672">*</span>result; <span style="color:#75715e">// rax
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int64</span> v5; <span style="color:#75715e">// r10
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int16</span> v6; <span style="color:#75715e">// si
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int16</span> v7; <span style="color:#75715e">// r11
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int16</span> v8; <span style="color:#75715e">// bx
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">__int16</span> v9; <span style="color:#75715e">// di
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>  Ldr <span style="color:#f92672">=</span> <span style="color:#a6e22e">NtCurrentPeb</span>()<span style="color:#f92672">-&gt;</span>Ldr;
+</span></span><span style="display:flex;"><span>  Flink <span style="color:#f92672">=</span> Ldr<span style="color:#f92672">-&gt;</span>InMemoryOrderModuleList.Flink;
+</span></span><span style="display:flex;"><span>  p_InMemoryOrderModuleList <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>Ldr<span style="color:#f92672">-&gt;</span>InMemoryOrderModuleList;
+</span></span><span style="display:flex;"><span>  result <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>i64;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> ( <span style="color:#ae81ff">2</span> )
+</span></span><span style="display:flex;"><span>  {
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> ( Flink <span style="color:#f92672">!=</span> p_InMemoryOrderModuleList )
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>      v5 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>i64;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">while</span> ( <span style="color:#ae81ff">1</span> )
+</span></span><span style="display:flex;"><span>      {
+</span></span><span style="display:flex;"><span>        v6 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_WORD <span style="color:#f92672">*</span>)(a1 <span style="color:#f92672">+</span> v5);
+</span></span><span style="display:flex;"><span>        v7 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_WORD <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>Flink[<span style="color:#ae81ff">5</span>].Flink<span style="color:#f92672">-&gt;</span>Flink <span style="color:#f92672">+</span> v5);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ( <span style="color:#f92672">!</span>v6 )
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>        v8 <span style="color:#f92672">=</span> v6 <span style="color:#f92672">+</span> <span style="color:#ae81ff">32</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ( (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int16</span>)(v6 <span style="color:#f92672">-</span> <span style="color:#ae81ff">65</span>) <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x1Au</span> )
+</span></span><span style="display:flex;"><span>          v8 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_WORD <span style="color:#f92672">*</span>)(a1 <span style="color:#f92672">+</span> v5);
+</span></span><span style="display:flex;"><span>        v9 <span style="color:#f92672">=</span> v7 <span style="color:#f92672">+</span> <span style="color:#ae81ff">32</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ( (<span style="color:#66d9ef">unsigned</span> <span style="color:#66d9ef">__int16</span>)(v7 <span style="color:#f92672">-</span> <span style="color:#ae81ff">65</span>) <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x1Au</span> )
+</span></span><span style="display:flex;"><span>          v9 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(_WORD <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>)<span style="color:#f92672">&amp;</span>Flink[<span style="color:#ae81ff">5</span>].Flink<span style="color:#f92672">-&gt;</span>Flink <span style="color:#f92672">+</span> v5);
+</span></span><span style="display:flex;"><span>        v5 <span style="color:#f92672">+=</span> <span style="color:#ae81ff">2</span>i64;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ( v8 <span style="color:#f92672">!=</span> v9 )
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">goto</span> LABEL_12;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> ( v7 )
+</span></span><span style="display:flex;"><span>      {
+</span></span><span style="display:flex;"><span>LABEL_12:
+</span></span><span style="display:flex;"><span>        Flink <span style="color:#f92672">=</span> Flink<span style="color:#f92672">-&gt;</span>Flink;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">continue</span>;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">return</span> Flink[<span style="color:#ae81ff">2</span>].Flink;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> result;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>A PEB walk is used get handles to libraries (see: <a href="https://www.youtube.com/watch?v=Tk3RWuqzvII)">https://www.youtube.com/watch?v=Tk3RWuqzvII)</a>. Thus, checking where the handles are used lead to <code>sub_18000D8FE</code>, which loads a specific library function.</p>
+<p>As I knew that at some point, the C2 is contacted, the control flow allowed me to make assumptions regarding which strings to decrypt.
+Below, you can see this process. As soon as I found <code>POST</code>, I knew I was in the right corner of the binary to look for the C2 URL. Eventually, after finding <code>wininet.dll</code> and <code>InternetConnectW</code> I got the URL.</p>
+<pre tabindex="0"><code>sub_18000CF2A // main function
+    sub_18000B3BB // eventually called by main, decrypts the string &#34;POST&#34;
+        sub_18000A1A9 // string &#34;POST&#34; is passed to this
+            sub_1800094D4 // decrypts the string &#34;wininet.dll&#34; and &#34;InternetConnectW&#34;
+                InternetConnectW // second parameter is the URL to connect to.
+    
+</code></pre><div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">decrypt wineloader payload
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">from</span> Crypto.Cipher <span style="color:#f92672">import</span> ARC4
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> struct
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>FILE <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;code/decrypted.bin&#34;</span>
+</span></span><span style="display:flex;"><span>KEY_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x58be</span>
+</span></span><span style="display:flex;"><span>KEYBYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">256</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_OFFSET <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x6296</span>
+</span></span><span style="display:flex;"><span>ENCRYPTED_BYTES <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1a</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>filebytes <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">with</span> open(FILE, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>    filebytes <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>key <span style="color:#f92672">=</span> filebytes[KEY_OFFSET:KEY_OFFSET<span style="color:#f92672">+</span>KEYBYTES]
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[ENCRYPTED_OFFSET:ENCRYPTED_OFFSET<span style="color:#f92672">+</span>ENCRYPTED_BYTES]
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># here, we decrypt the library name</span>
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;decrypted offset </span><span style="color:#e6db74">{:x}</span><span style="color:#e6db74">: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(ENCRYPTED_OFFSET, s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># this is the function that is being loaded from the lib</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x6FBA78ED00F7D404</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;I&#39;</span>, <span style="color:#ae81ff">0xFCF1BF11</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;decrypted: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG1 -&gt; HeapAlloc*</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x73B87BEF15F3C30A</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;I&#39;</span>, <span style="color:#ae81ff">0x0D31D</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG1: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG2</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x79B778DC35E6C305</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x15904A99DCA00D79</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG2: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG3</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1C8017FD65DDA612</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0xD37E</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG3: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG4</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x79B165E815F3C30A</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x7E</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG4: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG5</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x0F7CA11</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;I&#39;</span>, <span style="color:#ae81ff">0x17DE</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG5: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG6</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x6EB67EE201F3C90E</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x2BABEDA11F6EB67E</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x1</span>)
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG6: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG7</span>
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0x68B179DC00E6C80B</span>)
+</span></span><span style="display:flex;"><span>bytes <span style="color:#f92672">+=</span> struct<span style="color:#f92672">.</span>pack(<span style="color:#e6db74">&#39;&lt;Q&#39;</span>, <span style="color:#ae81ff">0xE07C92F1A33168B1</span>)
+</span></span><span style="display:flex;"><span>encrypted <span style="color:#f92672">=</span> bytearray([byte <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> bytes <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">!=</span> <span style="color:#e6db74">&#39;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#39;</span>])
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(encrypted)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG7: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG8</span>
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[<span style="color:#ae81ff">0x5e36</span>:<span style="color:#ae81ff">0x5e36</span><span style="color:#f92672">+</span><span style="color:#ae81ff">0x18</span>]
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG8: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG9</span>
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[<span style="color:#ae81ff">0x5c0e</span>:<span style="color:#ae81ff">0x5c0e</span><span style="color:#f92672">+</span><span style="color:#ae81ff">0x9e</span>]
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG8: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG9</span>
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[<span style="color:#ae81ff">0x5cb6</span>:<span style="color:#ae81ff">0x5cb6</span><span style="color:#f92672">+</span><span style="color:#ae81ff">0x11</span>]
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG9: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># bookmark TAG10</span>
+</span></span><span style="display:flex;"><span>data <span style="color:#f92672">=</span> filebytes[<span style="color:#ae81ff">0x5cd6</span>:<span style="color:#ae81ff">0x5cd6</span><span style="color:#f92672">+</span><span style="color:#ae81ff">0x22</span>]
+</span></span><span style="display:flex;"><span>cipher <span style="color:#f92672">=</span> ARC4<span style="color:#f92672">.</span>new(key)
+</span></span><span style="display:flex;"><span>decrypted <span style="color:#f92672">=</span> cipher<span style="color:#f92672">.</span>encrypt(data)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>s <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([<span style="color:#e6db74">&#34;</span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(chr(byte)) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> decrypted <span style="color:#66d9ef">if</span> byte <span style="color:#f92672">&gt;=</span> <span style="color:#ae81ff">0x20</span> <span style="color:#f92672">and</span> byte <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">0x7f</span>])
+</span></span><span style="display:flex;"><span>print(<span style="color:#e6db74">&#34;TAG10: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(s))
+</span></span></code></pre></div><pre><code>decrypted offset 6296: kernel32.dll
+decrypted: FreeConsole*`
+TAG1: HeapAlloc*`
+TAG2: GetProce4 a
+TAG3: POST+
+TAG4: HeapFree+
+TAG5: Slee*`
+TAG6: LoadLibrea
+TAG7: Internet_ri
+TAG8: wininet.dll
+TAG8: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.1) Gecko/20100101 Firefox/86.1
+TAG9: InternetConnectW
+TAG10: castechtools[.]com
+</code></pre>
+<p>I reached my goal, now we have the C2 URL from the article: <code>castechtools[.]com</code>!</p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

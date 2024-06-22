@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Notes on PEB Walking | 0xca7</title>
@@ -58,23 +58,23 @@
 <li>The list is doubly linked [3] what we have in <code>eax</code> is <code>*Flink</code> - now comes the part that got me confused: where does <code>eax+0x8</code> point to? If you look at the <code>LDR_MODULE</code> structure [4], you will see that the base address of NTDLL, which we want to fetch, is not at offset <code>0x8</code>, but at the offset <code>0x18</code> instead:</li>
 </ol>
 <p>Each <code>LIST_ENTRY</code> is 8 bytes, thus, the base address SHOULD be at offset <code>0x18</code>, why use the offset <code>0x08</code> then? The blog post [2] helps out here - without it, that would&rsquo;ve been a long debug session. We&rsquo;re actually <code>0x10</code> bytes into the <code>LDR_MODULE</code> struct with the <code>InInitalizationOrderModuleList</code>, thus, relatively speaking, the offset the to the base address is at <code>0x08</code>! I added the absolute and relative offsets to the struct below:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c" data-lang="c"><span style="color:#66d9ef">typedef</span> <span style="color:#66d9ef">struct</span> _LDR_MODULE {
-<span style="color:#75715e">/* offset */</span>
-<span style="color:#f92672">-</span><span style="color:#ae81ff">16</span>   <span style="color:#ae81ff">00</span>  LIST_ENTRY              _InLoadOrderModuleList_;
-<span style="color:#f92672">-</span><span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">08</span>  LIST_ENTRY              _InMemoryOrderModuleList_;
- <span style="color:#ae81ff">00</span>   <span style="color:#ae81ff">10</span>  LIST_ENTRY              _InInitializationOrderModuleList_;
- <span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">18</span>  PVOID                   _BaseAddress_;
-		  PVOID                   _EntryPoint_;
-		  ULONG                   _SizeOfImage_;
-		  UNICODE_STRING          _FullDllName_;
-		  UNICODE_STRING          _BaseDllName_;
-		  ULONG                   _Flags_;
-		  SHORT                   _LoadCount_;
-		  SHORT                   _TlsIndex_;
-		  LIST_ENTRY              _HashTableEntry_;
-		  ULONG                   _TimeDateStamp_;
-} LDR_MODULE, <span style="color:#f92672">*</span>PLDR_MODULE;
-</code></pre></div><p>Now it all makes sense. Shoutout to the author, dzzie for [2]. The PEB walk is available as C/ASM code and documented here: [5] - check it out if you want to compile a minimal version with source code to reverse and learn from.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">typedef</span> <span style="color:#66d9ef">struct</span> _LDR_MODULE {
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* offset */</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">-</span><span style="color:#ae81ff">16</span>   <span style="color:#ae81ff">00</span>  LIST_ENTRY              _InLoadOrderModuleList_;
+</span></span><span style="display:flex;"><span><span style="color:#f92672">-</span><span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">08</span>  LIST_ENTRY              _InMemoryOrderModuleList_;
+</span></span><span style="display:flex;"><span> <span style="color:#ae81ff">00</span>   <span style="color:#ae81ff">10</span>  LIST_ENTRY              _InInitializationOrderModuleList_;
+</span></span><span style="display:flex;"><span> <span style="color:#ae81ff">08</span>   <span style="color:#ae81ff">18</span>  PVOID                   _BaseAddress_;
+</span></span><span style="display:flex;"><span>		  PVOID                   _EntryPoint_;
+</span></span><span style="display:flex;"><span>		  ULONG                   _SizeOfImage_;
+</span></span><span style="display:flex;"><span>		  UNICODE_STRING          _FullDllName_;
+</span></span><span style="display:flex;"><span>		  UNICODE_STRING          _BaseDllName_;
+</span></span><span style="display:flex;"><span>		  ULONG                   _Flags_;
+</span></span><span style="display:flex;"><span>		  SHORT                   _LoadCount_;
+</span></span><span style="display:flex;"><span>		  SHORT                   _TlsIndex_;
+</span></span><span style="display:flex;"><span>		  LIST_ENTRY              _HashTableEntry_;
+</span></span><span style="display:flex;"><span>		  ULONG                   _TimeDateStamp_;
+</span></span><span style="display:flex;"><span>} LDR_MODULE, <span style="color:#f92672">*</span>PLDR_MODULE;
+</span></span></code></pre></div><p>Now it all makes sense. Shoutout to the author, dzzie for [2]. The PEB walk is available as C/ASM code and documented here: [5] - check it out if you want to compile a minimal version with source code to reverse and learn from.</p>
 <hr>
 <p>References:</p>
 <p>[1] <a href="http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/PEB.html">http://undocumented.ntinternals.net/UserMode/Undocumented%20Functions/NT%20Objects/Process/PEB.html</a></p>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Firmware Emulation with Docker | 0xca7</title>
@@ -48,14 +48,14 @@
 FROM scratch
 ADD ./firmware.tar.gz /
 COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin
-CMD [&quot;/usr/bin/qemu-mips-static&quot;, &quot;bin/busybox&quot;]
+CMD [&#34;/usr/bin/qemu-mips-static&#34;, &#34;bin/busybox&#34;]
 ENV ARCH=mips
 </code></pre><p>ARM from my setup:</p>
 <pre tabindex="0"><code>FROM multiarch/debian-debootstrap:armel-buster-slim as qemu
 FROM scratch
 ADD ./firmware.tar.gz /
 COPY --from=qemu /usr/bin/qemu-arm-static /usr/bin
-CMD [&quot;/usr/bin/qemu-arm-static&quot;, &quot;bin/busybox&quot;]
+CMD [&#34;/usr/bin/qemu-arm-static&#34;, &#34;bin/busybox&#34;]
 ENV ARCH=arm
 </code></pre><h2 id="build-the-container">Build the Container</h2>
 <p>Use the command:</p>

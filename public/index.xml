@@ -2,249 +2,186 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>0xca7</title>
-    <link>https://0xca7.github.io/</link>
+    <link>http://localhost:1313/</link>
     <description>Recent content on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 01 Jan 2024 10:00:43 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 22 Jun 2024 10:58:55 +0200</lastBuildDate>
+    <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Rust Reversing - Iterators</title>
+      <link>http://localhost:1313/posts/rustre1/</link>
+      <pubDate>Sat, 22 Jun 2024 10:58:55 +0200</pubDate>
+      <guid>http://localhost:1313/posts/rustre1/</guid>
+      <description>Prerequisites I&amp;rsquo;ll use Ghidra 11.0.2 for reversing, all binaries are built on Linux x86_64. Doesn&amp;rsquo;t matter which disassembler you use, Binja, IDA, Ghidra, neither does the OS Windows, Linux or Mac, doesn&amp;rsquo;t matter either. So, if you want to follow along, feel free to use any setup you want. It helps to know a bare minimum about Rust. If you don&amp;rsquo;t, at least you should know C :)&#xA;For cargo and rustc, I have the following versions:</description>
+    </item>
+    <item>
+      <title>Latrodectus</title>
+      <link>http://localhost:1313/mw/latrodectus/</link>
+      <pubDate>Sat, 11 May 2024 13:45:19 +0200</pubDate>
+      <guid>http://localhost:1313/mw/latrodectus/</guid>
+      <description>Sample: SHA256 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7&#xA;API Hashing The malware uses API hashing to hide imported API functions. The hash function used is CRC32:&#xA;/* address: 0x180006aa4 */ uint64_t uc_crc32(int64_t a_name, int32_t a_namelen) { if (data_180011318 == 0) { for (uint32_t i = 0; i &amp;lt; 0x100; i = (i + 1)) { uint32_t i_2 = i; for (int32_t j = 8; j &amp;gt; 0; j = (j - 1)) { if ((i_2 &amp;amp; 1) == 0) { i_2 = (i_2 &amp;gt;&amp;gt; 1); } else { i_2 = ((i_2 &amp;gt;&amp;gt; 1) ^ 0xedb88320); } } *(uint32_t*)(&amp;amp;data_180010f18 + (((uint64_t)i) &amp;lt;&amp;lt; 2)) = i_2; } data_180011318 = 1; } int32_t var_10 = 0xffffffff; for (int32_t i_1 = 0; i_1 &amp;lt; a_namelen; i_1 = (i_1 + 1)) { var_10 = ((var_10 &amp;gt;&amp;gt; 8) ^ *(uint32_t*)(&amp;amp;data_180010f18 + (((uint64_t)(*(uint8_t*)(a_name + ((uint64_t)i_1)) ^ var_10)) &amp;lt;&amp;lt; 2))); } return ((uint64_t)!</description>
+    </item>
+    <item>
+      <title>Wineloader</title>
+      <link>http://localhost:1313/mw/wineloader/</link>
+      <pubDate>Sat, 16 Mar 2024 10:27:33 +0000</pubDate>
+      <guid>http://localhost:1313/mw/wineloader/</guid>
+      <description>SHA256: 72b92683052e0c813890caf7b4f8bfd331a8b2afc324dd545d46138f677178c4&#xA;Resources: [1] https://www.zscaler.com/blogs/security-research/european-diplomats-targeted-spikedwine-wineloader&#xA;Summary The article in the resources above contains all the important information about the sample.&#xA;Goals:&#xA;find the C2 URL, just to have fun.&#xA;These analysis notes add to the zscaler report [1] by showing how to reach a subset of the presented conclusions and supply code snippets to help with analysis. Specifically, the means to statically decrypt the main payload of the sample are given, as well as a means for decrypting strings and the C2 URL used by the malware.</description>
+    </item>
+    <item>
+      <title>Crust of Rust - Notes</title>
+      <link>http://localhost:1313/notes/crust_of_rust/</link>
+      <pubDate>Sat, 13 Jan 2024 13:26:53 +0100</pubDate>
+      <guid>http://localhost:1313/notes/crust_of_rust/</guid>
+      <description>These are my notes for Crust of Rust: https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa&#xA;Memory Ordering and Atomics Lifetimes SmartPointers and Interior Mutability Memory Ordering and Atomics Why do we need atomics?&#xA;shared access to a memory value needs additional information in order for threads to synchronize and fix what guarantees are in place thread-safety: data races and undefined behavior is mitigated having an extra API has the added benefit of highlighting that we are issuing different instructions to the CPU: bool &amp;lt;-&amp;gt; AtomicBool Memory Model</description>
+    </item>
     <item>
       <title>Battling with APT malware</title>
-      <link>https://0xca7.github.io/mw/ca7vsapt/</link>
+      <link>http://localhost:1313/mw/ca7vsapt/</link>
       <pubDate>Mon, 01 Jan 2024 10:00:43 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/ca7vsapt/</guid>
-      <description>When I read malware analysis reports, I try to replicate them. That means I skim the report, if the malware is interesting, I get a sample and dig into it. When I get stuck, I go back to the report for help. I came across an interesting analysis of an APT malware: https://asec.ahnlab.com/en/57684/.
-As a target I decided to look at the dropper component:
-MD5: 1ecd83ee7e4cfc8fed7ceb998e75b996 SHA256: eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5 The report covers a lot of ground and explains the workings of the malware perfectly.</description>
+      <guid>http://localhost:1313/mw/ca7vsapt/</guid>
+      <description>When I read malware analysis reports, I try to replicate them. That means I skim the report, if the malware is interesting, I get a sample and dig into it. When I get stuck, I go back to the report for help. I came across an interesting analysis of an APT malware: https://asec.ahnlab.com/en/57684/.&#xA;As a target I decided to look at the dropper component:&#xA;MD5: 1ecd83ee7e4cfc8fed7ceb998e75b996 SHA256: eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5 The report covers a lot of ground and explains the workings of the malware perfectly.</description>
     </item>
-    
     <item>
       <title>Notes on PEB Walking</title>
-      <link>https://0xca7.github.io/mw/pebwalk_notes/</link>
+      <link>http://localhost:1313/mw/pebwalk_notes/</link>
       <pubDate>Tue, 17 Oct 2023 19:11:03 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/pebwalk_notes/</guid>
-      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader
-As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
+      <guid>http://localhost:1313/mw/pebwalk_notes/</guid>
+      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader&#xA;As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
     </item>
-    
     <item>
       <title>Reverse Engineering Router Firmware - But the Firmware is Encrypted</title>
-      <link>https://0xca7.github.io/public/posts/decrypting_firmware/</link>
+      <link>http://localhost:1313/public/posts/decrypting_firmware/</link>
       <pubDate>Sun, 01 Oct 2023 10:26:15 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/public/posts/decrypting_firmware/</guid>
-      <description>Author: 0xca7
-Introduction For the last couple of years, I&amp;rsquo;ve been doing some security research on network equipment (routers, switches, etc.) for consumer, enterprise and industrial applications. I did this mostly out of curiosity and to get better at reverse engineering. I noticed that a lot of tutorials cover downloading firmware, unpacking it with binwalk and that&amp;rsquo;s it. There&amp;rsquo;s rarely any reverse engineering going on. That&amp;rsquo;s fine, you gotta started somewhere and it&amp;rsquo;s resources like this that get people started.</description>
+      <guid>http://localhost:1313/public/posts/decrypting_firmware/</guid>
+      <description>Author: 0xca7&#xA;Introduction For the last couple of years, I&amp;rsquo;ve been doing some security research on network equipment (routers, switches, etc.) for consumer, enterprise and industrial applications. I did this mostly out of curiosity and to get better at reverse engineering. I noticed that a lot of tutorials cover downloading firmware, unpacking it with binwalk and that&amp;rsquo;s it. There&amp;rsquo;s rarely any reverse engineering going on. That&amp;rsquo;s fine, you gotta started somewhere and it&amp;rsquo;s resources like this that get people started.</description>
     </item>
-    
     <item>
       <title>Extract cramfs</title>
-      <link>https://0xca7.github.io/notes/extract_cramfs/</link>
+      <link>http://localhost:1313/notes/extract_cramfs/</link>
       <pubDate>Sat, 25 Feb 2023 20:56:49 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/extract_cramfs/</guid>
-      <description>check if LE or BE
-file cramfs if the file is big endian, make it little endian with this
-cramfsswap cramfs cramfs_le extract
-# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;quot;cramfs_le&amp;quot; sudo fsck.cramfs --extract=fs cramfs_le </description>
+      <guid>http://localhost:1313/notes/extract_cramfs/</guid>
+      <description>check if LE or BE&#xA;file cramfs if the file is big endian, make it little endian with this&#xA;cramfsswap cramfs cramfs_le extract&#xA;# if not converted via the command above, cramfs is little endian sudo fsck.cramfs --extract=fs cramfs # if converted via the command above, the file is renamed to &amp;#34;cramfs_le&amp;#34; sudo fsck.cramfs --extract=fs cramfs_le </description>
     </item>
-    
     <item>
       <title>Mounting UBIFS</title>
-      <link>https://0xca7.github.io/notes/mount_ubifs/</link>
+      <link>http://localhost:1313/notes/mount_ubifs/</link>
       <pubDate>Sat, 25 Feb 2023 20:51:56 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/mount_ubifs/</guid>
-      <description>Detailed Information: http://trac.gateworks.com/wiki/linux/ubi
-simulate a NAND device
-modprobe nandsim first_id_byte=0x2c second_id_byte=0xac third_id_byte=0x90 fourth_id_byte=0x15 check if the device is set up
-cat /proc/mtd clean the device
-flash_erase /dev/mtd0 0 0 format and flash
-ubiformat /dev/mtd0 -f image.ubi -O 2048 attach device
-modprobe ubi ubiattach -p /dev/mtd0 -O 2048 and now mount the device - mind you have to replace the X with 0,1,2...
-mount -t ubifs /dev/ubi0_X /mnt/ubifs </description>
+      <guid>http://localhost:1313/notes/mount_ubifs/</guid>
+      <description>Detailed Information: http://trac.gateworks.com/wiki/linux/ubi&#xA;simulate a NAND device&#xA;modprobe nandsim first_id_byte=0x2c second_id_byte=0xac third_id_byte=0x90 fourth_id_byte=0x15 check if the device is set up&#xA;cat /proc/mtd clean the device&#xA;flash_erase /dev/mtd0 0 0 format and flash&#xA;ubiformat /dev/mtd0 -f image.ubi -O 2048 attach device&#xA;modprobe ubi ubiattach -p /dev/mtd0 -O 2048 and now mount the device - mind you have to replace the X with 0,1,2...&#xA;mount -t ubifs /dev/ubi0_X /mnt/ubifs </description>
     </item>
-    
     <item>
       <title>Reversing AARCH64 C&#43;&#43; Binaries</title>
-      <link>https://0xca7.github.io/posts/aarch64_cpp/</link>
+      <link>http://localhost:1313/posts/aarch64_cpp/</link>
       <pubDate>Fri, 06 Jan 2023 18:17:14 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/aarch64_cpp/</guid>
-      <description>In the files below you can find my notes regarding reversing C++ binaries compiled for AARCH64 / ARM64. The compiler used for all of these is g++, the stripping of one of the binaries was achieved via the strip command. No options were given to g++ when compiling on an aarch64 Debian 11 system. Enjoy.
-00 - Basic Classes
-01 - Pure Virtual Methods I
-02 - Abstract Class
-03 - Template</description>
+      <guid>http://localhost:1313/posts/aarch64_cpp/</guid>
+      <description>In the files below you can find my notes regarding reversing C++ binaries compiled for AARCH64 / ARM64. The compiler used for all of these is g++, the stripping of one of the binaries was achieved via the strip command. No options were given to g++ when compiling on an aarch64 Debian 11 system. Enjoy.&#xA;00 - Basic Classes&#xA;01 - Pure Virtual Methods I&#xA;02 - Abstract Class&#xA;03 - Template</description>
     </item>
-    
     <item>
       <title>Firmware Emulation with Docker</title>
-      <link>https://0xca7.github.io/notes/docker_emulation/</link>
+      <link>http://localhost:1313/notes/docker_emulation/</link>
       <pubDate>Mon, 14 Nov 2022 19:24:18 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/docker_emulation/</guid>
-      <description>Resources My main resources for this post is the talk here:
-https://www.youtube.com/watch?v=ALn0hUxNszI&amp;amp;t=1288s
-Credit to the Author.
-I just took what he&amp;rsquo;s doing and made it work on my machine, instead of MIPS I&amp;rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.
- Create a Dockerfile MIPS from the talk in [Resources]:
-FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;quot;/usr/bin/qemu-mips-static&amp;quot;, &amp;quot;bin/busybox&amp;quot;] ENV ARCH=mips ARM from my setup:</description>
+      <guid>http://localhost:1313/notes/docker_emulation/</guid>
+      <description>Resources My main resources for this post is the talk here:&#xA;https://www.youtube.com/watch?v=ALn0hUxNszI&amp;amp;t=1288s&#xA;Credit to the Author.&#xA;I just took what he&amp;rsquo;s doing and made it work on my machine, instead of MIPS I&amp;rsquo;m running ARM though. I expand upon the examples in the talk by adding some stuff of my own.&#xA;Create a Dockerfile MIPS from the talk in [Resources]:&#xA;FROM multiarch/debian-debootstrap:mips-buster-slim as qemu FROM scratch ADD ./firmware.tar.gz / COPY --from=qemu /usr/bin/qemu-mips-static /usr/bin CMD [&amp;#34;/usr/bin/qemu-mips-static&amp;#34;, &amp;#34;bin/busybox&amp;#34;] ENV ARCH=mips ARM from my setup:</description>
     </item>
-    
     <item>
       <title>Lattice Cryptography Notes</title>
-      <link>https://0xca7.github.io/notes/pq_lattice/</link>
+      <link>http://localhost:1313/notes/pq_lattice/</link>
       <pubDate>Wed, 14 Sep 2022 19:42:07 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/pq_lattice/</guid>
-      <description>These are my notes for lattice crypto, please mind the mentioned authors that enabled me to take these notes. All credit goes to those people, not me.
-see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;
- </description>
+      <guid>http://localhost:1313/notes/pq_lattice/</guid>
+      <description>These are my notes for lattice crypto, please mind the mentioned authors that enabled me to take these notes. All credit goes to those people, not me.&#xA;see notes here &amp;raquo; Notes on Lattice Cryptography &amp;laquo;</description>
     </item>
-    
     <item>
       <title>The Art of Malware Analysis - Course Review</title>
-      <link>https://0xca7.github.io/posts/aoma/</link>
+      <link>http://localhost:1313/posts/aoma/</link>
       <pubDate>Mon, 12 Sep 2022 10:12:29 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/aoma/</guid>
-      <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).
-Time to do my part and review the course. I like small reviews, so I will keep it at that.
-Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.
-Key Points  very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction  Details The course starts with a general introduction to malware and the analysis of malware.</description>
+      <guid>http://localhost:1313/posts/aoma/</guid>
+      <description>A couple of months ago I surprisingly won a voucher for The Art of Malware Analysis by @nu11charb (course: https://courses.null-char.com/courses/the-art-of-malware-analysis).&#xA;Time to do my part and review the course. I like small reviews, so I will keep it at that.&#xA;Review Let&amp;rsquo;s start with a summary of the key points I noticed while doing the course.&#xA;Key Points very thourough, covers basic and intermediate malware analysis topics expects students to do the supplied exercises to understand the material works with real-world malware covers x86 assembly in an accessible way covers automating tasks and config extraction Details The course starts with a general introduction to malware and the analysis of malware.</description>
     </item>
-    
     <item>
       <title>Stop/DJVU Analysis</title>
-      <link>https://0xca7.github.io/mw/stop_djvu/</link>
+      <link>http://localhost:1313/mw/stop_djvu/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:46 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/stop_djvu/</guid>
+      <guid>http://localhost:1313/mw/stop_djvu/</guid>
       <description>Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
     </item>
-    
     <item>
       <title>Linux Botnet Analysis</title>
-      <link>https://0xca7.github.io/mw/linux_botnet/</link>
+      <link>http://localhost:1313/mw/linux_botnet/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:40 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/linux_botnet/</guid>
+      <guid>http://localhost:1313/mw/linux_botnet/</guid>
       <description>Analysis of a botnet malware targeting Linux systems Linux Botnet</description>
     </item>
-    
     <item>
       <title>Golang Stealer</title>
-      <link>https://0xca7.github.io/mw/golang_stealer/</link>
+      <link>http://localhost:1313/mw/golang_stealer/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:34 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/golang_stealer/</guid>
+      <guid>http://localhost:1313/mw/golang_stealer/</guid>
       <description>Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer</description>
     </item>
-    
     <item>
       <title>Redline Stealer Analysis</title>
-      <link>https://0xca7.github.io/mw/redline/</link>
+      <link>http://localhost:1313/mw/redline/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:29 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/redline/</guid>
+      <guid>http://localhost:1313/mw/redline/</guid>
       <description>Analysis of the famous Redline stealer Redline Stealer</description>
     </item>
-    
     <item>
       <title>Blackguard</title>
-      <link>https://0xca7.github.io/mw/blackguard/</link>
+      <link>http://localhost:1313/mw/blackguard/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:24 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/blackguard/</guid>
-      <description>get the Blackguard stealer analysis from my old site here as a pdf:
-Analysis of a .NET infostealer Blackguard Stealer</description>
+      <guid>http://localhost:1313/mw/blackguard/</guid>
+      <description>get the Blackguard stealer analysis from my old site here as a pdf:&#xA;Analysis of a .NET infostealer Blackguard Stealer</description>
     </item>
-    
     <item>
       <title>Debian ARM/aarch64 in virt-manager</title>
-      <link>https://0xca7.github.io/notes/virt-manager-arm/</link>
+      <link>http://localhost:1313/notes/virt-manager-arm/</link>
       <pubDate>Thu, 01 Sep 2022 18:45:47 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/virt-manager-arm/</guid>
-      <description>This note describes how to use virt-manager on a x86-64 system and install an ARM or aarch64 operating system, namely Debian Linux.
-Requirements First install all requirements:
-sudo apt install -y virt-manager qemu-kvm python-is-python3 guestfish Enable and run libvirtd
-sudo systemctl enable libvirtd sudo systemctl start libvirtd Add your user to the appropriate group
-sudo usermod -a -G libvirt $USER Best to reboot after this.
-Debian Installation We need the Debian DVD as it comes with all the components we are interested in.</description>
+      <guid>http://localhost:1313/notes/virt-manager-arm/</guid>
+      <description>This note describes how to use virt-manager on a x86-64 system and install an ARM or aarch64 operating system, namely Debian Linux.&#xA;Requirements First install all requirements:&#xA;sudo apt install -y virt-manager qemu-kvm python-is-python3 guestfish Enable and run libvirtd&#xA;sudo systemctl enable libvirtd sudo systemctl start libvirtd Add your user to the appropriate group&#xA;sudo usermod -a -G libvirt $USER Best to reboot after this.&#xA;Debian Installation We need the Debian DVD as it comes with all the components we are interested in.</description>
     </item>
-    
     <item>
       <title>Mount JFFS2 Filesystems</title>
-      <link>https://0xca7.github.io/notes/mount_jffs2/</link>
+      <link>http://localhost:1313/notes/mount_jffs2/</link>
       <pubDate>Wed, 31 Aug 2022 19:09:03 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/mount_jffs2/</guid>
-      <description>When reversing firmware, you often just get a blob of data from the vendor website. Usually, you look at it in a hex editor and/or run binwalk on it to identify what the blob contains. I often run into the JFFS2 filesystem (https://en.wikipedia.org/wiki/JFFS2).
-Running binwalk -e on the firmware to extract the components will leave you with a JFFS2 file which is not further extracted. The script below can be used on this file to mount it so you can get at the data contained in the filesystem.</description>
+      <guid>http://localhost:1313/notes/mount_jffs2/</guid>
+      <description>When reversing firmware, you often just get a blob of data from the vendor website. Usually, you look at it in a hex editor and/or run binwalk on it to identify what the blob contains. I often run into the JFFS2 filesystem (https://en.wikipedia.org/wiki/JFFS2).&#xA;Running binwalk -e on the firmware to extract the components will leave you with a JFFS2 file which is not further extracted. The script below can be used on this file to mount it so you can get at the data contained in the filesystem.</description>
     </item>
-    
     <item>
       <title>Docker Notes</title>
-      <link>https://0xca7.github.io/notes/docker/</link>
+      <link>http://localhost:1313/notes/docker/</link>
       <pubDate>Wed, 31 Aug 2022 16:32:04 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/docker/</guid>
-      <description>Docker notes about how to do things with docker for reference.
-Installation Best to get the version directly from docker.com, see:
-https://docs.docker.com/engine/install/debian/
-or
-https://docs.docker.com/engine/install/ubuntu/
-Images You can get official images via docker directly. See https://hub.docker.com/ - this shows the commands to pull images.
-Example:
-docker pull debian Containers Creating a container from the image can be done as follows:
-Create a container debian_test based on the debian image with full host network access, launch it and attach to it.</description>
+      <guid>http://localhost:1313/notes/docker/</guid>
+      <description>Docker notes about how to do things with docker for reference.&#xA;Installation Best to get the version directly from docker.com, see:&#xA;https://docs.docker.com/engine/install/debian/&#xA;or&#xA;https://docs.docker.com/engine/install/ubuntu/&#xA;Images You can get official images via docker directly. See https://hub.docker.com/ - this shows the commands to pull images.&#xA;Example:&#xA;docker pull debian Containers Creating a container from the image can be done as follows:&#xA;Create a container debian_test based on the debian image with full host network access, launch it and attach to it.</description>
     </item>
-    
     <item>
       <title>Ghidrathon &#43; Unicorn Engine &#43; Capstone</title>
-      <link>https://0xca7.github.io/posts/ghidrathon_unicorn/</link>
+      <link>http://localhost:1313/posts/ghidrathon_unicorn/</link>
       <pubDate>Sun, 28 Aug 2022 19:32:42 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/ghidrathon_unicorn/</guid>
-      <description>Ghidra with Ghidrathon + Unicorn Engine The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&amp;rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.
-My Script I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3].</description>
+      <guid>http://localhost:1313/posts/ghidrathon_unicorn/</guid>
+      <description>Ghidra with Ghidrathon + Unicorn Engine The below script is a convenient way to combine the Ghidrathon extension (Python3 in Ghidra) developed by Mandiant [1] and the Unicorn Emulator [2]. As shown in Mandiant&amp;rsquo;s blog post, unicorn is called from the Ghidrathon command line. I took that idea and automated to process a little bit.&#xA;My Script I created a simple Ghidra Python3 script that uses unicorn together with the capstone disassembler [3].</description>
     </item>
-    
     <item>
       <title>Calling Conventions</title>
-      <link>https://0xca7.github.io/notes/calling_conventions/</link>
+      <link>http://localhost:1313/notes/calling_conventions/</link>
       <pubDate>Fri, 26 Aug 2022 20:56:15 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/notes/calling_conventions/</guid>
-      <description>This is a small overview of calling conventions regarding the x86 and x86_64 architectures, both for Windows and Linux
- Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function.</description>
+      <guid>http://localhost:1313/notes/calling_conventions/</guid>
+      <description>This is a small overview of calling conventions regarding the x86 and x86_64 architectures, both for Windows and Linux&#xA;Windows The stdcall calling convention &amp;hellip; the callee is responsible for cleaning up the stack, but the parameters are pushed onto the stack in right-to-left order, as in the _cdecl calling convention (here: caller must clean up the stack). Registers EAX, ECX, and EDX are designated for use within the function. Return values are stored in the EAX register.</description>
     </item>
-    
     <item>
       <title>Collection of Malware Analysis Writeups</title>
-      <link>https://0xca7.github.io/mw/malware_analysis/</link>
+      <link>http://localhost:1313/mw/malware_analysis/</link>
       <pubDate>Fri, 26 Aug 2022 15:46:59 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/malware_analysis/</guid>
-      <description>All of the files below are PDFs, they have been saved as such from my old site.
-Analysis of a .NET infostealer Blackguard Stealer
-Analysis of the famous Redline stealer Redline Stealer
-Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer
-Analysis of a botnet malware targeting Linux systems Linux Botnet
-Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
+      <guid>http://localhost:1313/mw/malware_analysis/</guid>
+      <description>All of the files below are PDFs, they have been saved as such from my old site.&#xA;Analysis of a .NET infostealer Blackguard Stealer&#xA;Analysis of the famous Redline stealer Redline Stealer&#xA;Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer&#xA;Analysis of a botnet malware targeting Linux systems Linux Botnet&#xA;Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
     </item>
-    
     <item>
       <title>ARM Cortex-M3 libopencm3 Project</title>
-      <link>https://0xca7.github.io/posts/libopencm3_project/</link>
+      <link>http://localhost:1313/posts/libopencm3_project/</link>
       <pubDate>Fri, 29 Jul 2022 20:36:47 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/posts/libopencm3_project/</guid>
+      <guid>http://localhost:1313/posts/libopencm3_project/</guid>
       <description>Introduction A while ago I ordered a STM32 Blue Pill board. This normally features a STM32F103C8T6 microcontroller, however, mine has a STM32F103C6T6 on it. I decided to program it using libopencm3 (http://libopencm3.org/). As the STMF103C6T6 does not feature a floating point unit (FPU), I thought I&amp;rsquo;d play with fixed point numbers a little. In this post, I will document the simple fixed-point arithmetic I implemented and show how to use</description>
     </item>
-    
   </channel>
 </rss>

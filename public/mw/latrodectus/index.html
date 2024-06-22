@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Latrodectus | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Latrodectus</span></h1>
+
+<h2 class="date">2024/05/11</h2>
+</div>
+
+<main>
+<p>Sample: <code>SHA256 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7</code></p>
+<h2 id="api-hashing">API Hashing</h2>
+<p>The malware uses API hashing to hide imported API functions. The hash function
+used is CRC32:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* address: 0x180006aa4 */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">uint64_t</span> <span style="color:#a6e22e">uc_crc32</span>(<span style="color:#66d9ef">int64_t</span> a_name, <span style="color:#66d9ef">int32_t</span> a_namelen)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (data_180011318 <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">uint32_t</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0x100</span>; i <span style="color:#f92672">=</span> (i <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>        {
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">uint32_t</span> i_2 <span style="color:#f92672">=</span> i;
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int32_t</span> j <span style="color:#f92672">=</span> <span style="color:#ae81ff">8</span>; j <span style="color:#f92672">&gt;</span> <span style="color:#ae81ff">0</span>; j <span style="color:#f92672">=</span> (j <span style="color:#f92672">-</span> <span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>            {
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">if</span> ((i_2 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>                {
+</span></span><span style="display:flex;"><span>                    i_2 <span style="color:#f92672">=</span> (i_2 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>                }
+</span></span><span style="display:flex;"><span>                <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>                {
+</span></span><span style="display:flex;"><span>                    i_2 <span style="color:#f92672">=</span> ((i_2 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xedb88320</span>);
+</span></span><span style="display:flex;"><span>                }
+</span></span><span style="display:flex;"><span>            }
+</span></span><span style="display:flex;"><span>            <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint32_t</span><span style="color:#f92672">*</span>)(<span style="color:#f92672">&amp;</span>data_180010f18 <span style="color:#f92672">+</span> (((<span style="color:#66d9ef">uint64_t</span>)i) <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">2</span>)) <span style="color:#f92672">=</span> i_2;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>        data_180011318 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int32_t</span> var_10 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xffffffff</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (<span style="color:#66d9ef">int32_t</span> i_1 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i_1 <span style="color:#f92672">&lt;</span> a_namelen; i_1 <span style="color:#f92672">=</span> (i_1 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>))
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        var_10 <span style="color:#f92672">=</span> ((var_10 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">^</span> <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint32_t</span><span style="color:#f92672">*</span>)(<span style="color:#f92672">&amp;</span>data_180010f18 <span style="color:#f92672">+</span> (((<span style="color:#66d9ef">uint64_t</span>)(<span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(a_name <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i_1)) <span style="color:#f92672">^</span> var_10)) <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">2</span>)));
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> ((<span style="color:#66d9ef">uint64_t</span>)<span style="color:#f92672">!</span>(var_10));
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Functions are resolved using the hash value, the DLL base address to load the
+function from and an address to store the resulting function pointer. Below is
+an example for <code>VirtualAlloc</code> from <code>kernel32.dll</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* address: 0x18000949a */</span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* hash */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int32_t</span> var_878 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x9ce0d4a</span>;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* dll base address to load from */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span><span style="color:#f92672">*</span> var_870 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>g_KERNEL32DLL_BASE;
+</span></span><span style="display:flex;"><span><span style="color:#75715e">/* pointer to the location the function address will be stored */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int64_t</span><span style="color:#f92672">*</span> v_func_addr <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>g_VirtualAlloc;
+</span></span></code></pre></div><p>The <code>(hash, dll_base, pointer)</code> triple is built on the stack, one for each
+function to import, a loop does the importing via API Hashing
+(example: <code>0x18000a2f3</code>).</p>
+<p>API Hashing is easily defeated using hashdb (<code>https://github.com/OALabs/hashdb</code>)
+for the disassembler of choice. Through this, the parts of the malware used
+for C2 communication are identified. For example <code>InternetOpenW</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* address: 180004c70 */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int64_t</span> <span style="color:#a6e22e">uc_connect</span>(<span style="color:#66d9ef">int64_t</span> arg1, <span style="color:#66d9ef">int64_t</span> a_SERVERNAME, <span style="color:#66d9ef">int16_t</span> arg3)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int32_t</span> r9;
+</span></span><span style="display:flex;"><span>    arg_20 <span style="color:#f92672">=</span> r9;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int64_t</span> var_10 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int32_t</span> var_30;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int32_t</span> var_28;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int64_t</span> var_20;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int64_t</span> v_inethandle <span style="color:#f92672">=</span> <span style="color:#a6e22e">g_InternetOpenW</span>(arg1, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, var_30, 
+</span></span><span style="display:flex;"><span>        var_28, var_20, <span style="color:#ae81ff">0</span>, var_10);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (v_inethandle <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        var_20 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>        var_28 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>        var_30 <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>;
+</span></span><span style="display:flex;"><span>        var_10 <span style="color:#f92672">=</span> <span style="color:#a6e22e">g_InternetConnectA</span>(v_inethandle, a_SERVERNAME, 
+</span></span><span style="display:flex;"><span>            ((<span style="color:#66d9ef">uint64_t</span>)arg3), <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>, v_inethandle);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> var_10;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Backtracking from <code>InternetConnectA</code> eventually leads to the following function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* address: 180006988 */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int64_t</span> <span style="color:#a6e22e">sub_180006988</span>()
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    data_1800109b4 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    g_URL_STORAGE <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_allocate</span>(<span style="color:#ae81ff">0x18</span>);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span> a_str;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span> aout;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_decrypt</span>(<span style="color:#f92672">&amp;</span>data_180010250, <span style="color:#f92672">&amp;</span>aout) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        a_str <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>aout;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        a_str <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>aout;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint64_t</span><span style="color:#f92672">*</span>)(g_URL_STORAGE <span style="color:#f92672">+</span> (((<span style="color:#66d9ef">uint64_t</span>)data_1800109b4) <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">3</span>)) <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_strdup</span>(a_str, <span style="color:#a6e22e">uc_strlen</span>(a_str));
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span> rax_4;
+</span></span><span style="display:flex;"><span>    rax_4 <span style="color:#f92672">=</span> data_1800109b4;
+</span></span><span style="display:flex;"><span>    rax_4 <span style="color:#f92672">=</span> (rax_4 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    data_1800109b4 <span style="color:#f92672">=</span> rax_4;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">void</span><span style="color:#f92672">*</span> a_str_1;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_decrypt</span>(<span style="color:#f92672">&amp;</span>data_180010278, <span style="color:#f92672">&amp;</span>aout) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        a_str_1 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>aout;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span>
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        a_str_1 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>aout;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint64_t</span><span style="color:#f92672">*</span>)(g_URL_STORAGE <span style="color:#f92672">+</span> (((<span style="color:#66d9ef">uint64_t</span>)data_1800109b4) <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">3</span>)) <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_strdup</span>(a_str_1, <span style="color:#a6e22e">uc_strlen</span>(a_str_1));
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span> rax_8;
+</span></span><span style="display:flex;"><span>    rax_8 <span style="color:#f92672">=</span> data_1800109b4;
+</span></span><span style="display:flex;"><span>    rax_8 <span style="color:#f92672">=</span> (rax_8 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    data_1800109b4 <span style="color:#f92672">=</span> rax_8;
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint64_t</span><span style="color:#f92672">*</span>)(g_URL_STORAGE <span style="color:#f92672">+</span> (((<span style="color:#66d9ef">uint64_t</span>)data_1800109b4) <span style="color:#f92672">&lt;&lt;</span> <span style="color:#ae81ff">3</span>)) <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Here, an allocation for the C2 URLs is made, eventually, the URLs are decrypted.</p>
+<h2 id="c2-url">C2 URL</h2>
+<p>String decryption is done via the following function:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/* address: 0x18000ae78 */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int64_t</span> uc_<span style="color:#f92672">?</span><span style="color:#a6e22e">_decrypt</span>(<span style="color:#66d9ef">int32_t</span><span style="color:#f92672">*</span> ain, <span style="color:#66d9ef">int64_t</span> aout)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// the first 32-bits of the input
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">int32_t</span> ain[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint32_t</span><span style="color:#f92672">*</span>)ain;
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// xor&#39;d with the next 32-bits of the input
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">int16_t</span> v_xor <span style="color:#f92672">=</span> (ain[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">^</span> ain[<span style="color:#ae81ff">1</span>]);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">int16_t</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> (((<span style="color:#66d9ef">uint32_t</span>)i) <span style="color:#f92672">&lt;</span> ((<span style="color:#66d9ef">uint32_t</span>)v_xor))
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">uint64_t</span> v_cur0;  <span style="color:#75715e">// byte 6 onwards
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        v_cur0 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(((<span style="color:#66d9ef">char</span><span style="color:#f92672">*</span>)ain <span style="color:#f92672">+</span> <span style="color:#ae81ff">6</span>) <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i));
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">char</span> v_cur_00 <span style="color:#f92672">=</span> v_cur0;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">uint64_t</span> v_cur1;
+</span></span><span style="display:flex;"><span>        v_cur1 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(((<span style="color:#66d9ef">char</span><span style="color:#f92672">*</span>)ain <span style="color:#f92672">+</span> <span style="color:#ae81ff">6</span>) <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i));
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">char</span> var_17_2 <span style="color:#f92672">=</span> ((v_cur1 <span style="color:#f92672">+</span> v_cur_00) <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xa</span>);
+</span></span><span style="display:flex;"><span>        ain[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> <span style="color:#a6e22e">uc_add_one</span>(ain[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(aout <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i)) <span style="color:#f92672">=</span> ((<span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(aout <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i)) <span style="color:#f92672">+</span> v_cur_00) <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xa</span>);
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span>(<span style="color:#66d9ef">uint8_t</span><span style="color:#f92672">*</span>)(aout <span style="color:#f92672">+</span> ((<span style="color:#66d9ef">uint64_t</span>)i)) <span style="color:#f92672">=</span> (v_cur_00 <span style="color:#f92672">^</span> ain[<span style="color:#ae81ff">0</span>]);
+</span></span><span style="display:flex;"><span>        i <span style="color:#f92672">=</span> (i <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> aout;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Translated to python this becomes:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python3" data-lang="python3"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">decrypts a string and returns a 8-bit and 16-bit string as these are mixed
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">in the malware
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decrypt</span>(encrypted):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    out <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    a0 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">0</span>:<span style="color:#ae81ff">4</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    a1 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">4</span>:<span style="color:#ae81ff">8</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    length <span style="color:#f92672">=</span> (a0 <span style="color:#f92672">^</span> a1) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xffff</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    key <span style="color:#f92672">=</span> a0
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, length):
+</span></span><span style="display:flex;"><span>        val <span style="color:#f92672">=</span> encrypted[<span style="color:#ae81ff">6</span> <span style="color:#f92672">+</span> i]
+</span></span><span style="display:flex;"><span>        key <span style="color:#f92672">=</span> key <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        out<span style="color:#f92672">.</span>append((val <span style="color:#f92672">^</span> key) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># interpret as wide string</span>
+</span></span><span style="display:flex;"><span>    wide <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(out[i]) <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>,len(out),<span style="color:#ae81ff">2</span>)])
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (<span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(byte) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> out]), wide)
+</span></span></code></pre></div><p>Note that the malware contains wide strings and 8-bit strings.</p>
+<p>As an example for an encrypted string, take a look at these two.</p>
+<pre tabindex="0"><code>18000f7d0  data_18000f7d0:
+18000f7d0  7e d0 dd ad 71 d0 59 f7 e9 ed e2 e9 ec d9 e0 fa  ~...q.Y.........
+18000f7e0  e6 ff fb b1 8d 00 00 00                          ........
+--- SNIP ---
+18000f7f0  data_18000f7f0:
+18000f7f0  7e d0 dd ad 76 d0 5d f0 e8 e6 a1 be a5 86 00 00  ~...v.].........
+</code></pre><p>Each encrypted string starts with a sequence of 4 bytes which is the same for
+all encrypted strings. This sequence is unique for each sample analyzed for this
+report. Here, the sequence is <code>0x7e 0xd0 0xdd 0xad</code>. Further, <code>0x00</code> delimits
+each string.</p>
+<p>As such, searching for encrypted strings can be automated, as well as the decryption
+and search for URLs via the following code. In addition to the sample mentioned
+at the start of this report, <code>SHA256 6091f2589fef42e0ab3d7975806cd8a0da012b519637c03b73f702f7586b21ef</code>
+was also analyzed. Here, the 4-byte sequence prepended to encrypted strings differs
+and is given in <code>STRING_ANCHOR1</code> in the script below. For the sample <code>SHA256 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7</code>,
+the sequence is stored in <code>STRING_ANCHOR0</code>.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">config extraction for sample 
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">SHA256: 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">the url of the C2 server is encrypted using some custom encryption algorithm
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">the malware resolves APIs by PEB walk and API hashing with CRC32 (0xEDB88320)
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">an encrypted string starts with &#34;0x7e 0xd0 0xdd 0xad&#34; and ends with &#34;0x00&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">we&#39;ll call the first 4 bytes the STRING_ANCHOR
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> re
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>STRING_ANCHOR0 <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;~</span><span style="color:#ae81ff">\xd0\xdd\xad</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>STRING_ANCHOR1 <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;@</span><span style="color:#ae81ff">\x9d</span><span style="color:#e6db74">b3&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>REGEXP_URL <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&amp;+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">decrypt a string
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decrypt</span>(encrypted):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    out <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    a0 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">0</span>:<span style="color:#ae81ff">4</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    a1 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">4</span>:<span style="color:#ae81ff">8</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    length <span style="color:#f92672">=</span> (a0 <span style="color:#f92672">^</span> a1) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xffff</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    key <span style="color:#f92672">=</span> a0
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, length):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># in case we caught something that isn&#39;t a valid encrypted string</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> len(encrypted) <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">6</span><span style="color:#f92672">+</span>i:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> (<span style="color:#66d9ef">None</span>, <span style="color:#66d9ef">None</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        val <span style="color:#f92672">=</span> encrypted[<span style="color:#ae81ff">6</span> <span style="color:#f92672">+</span> i]
+</span></span><span style="display:flex;"><span>        key <span style="color:#f92672">=</span> key <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        out<span style="color:#f92672">.</span>append((val <span style="color:#f92672">^</span> key) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># interpret as wide string</span>
+</span></span><span style="display:flex;"><span>    wide <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(out[i]) <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>,len(out),<span style="color:#ae81ff">2</span>)])
+</span></span><span style="display:flex;"><span>    ascii <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(byte) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> out])
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (ascii, wide)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">once a string anchor is found, collect the encrypted string
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">extract_string</span>(data) <span style="color:#f92672">-&gt;</span> bytearray:
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    bytes <span style="color:#f92672">=</span> bytearray()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> data[i]<span style="color:#f92672">.</span>to_bytes() <span style="color:#f92672">!=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#34;</span>:
+</span></span><span style="display:flex;"><span>        bytes <span style="color:#f92672">+=</span> bytearray(data[i]<span style="color:#f92672">.</span>to_bytes())
+</span></span><span style="display:flex;"><span>        i <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>    bytes <span style="color:#f92672">+=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> bytes
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">find string anchors and collecte encrypted strings
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">find_encrypted</span>(data, string_anchor) <span style="color:#f92672">-&gt;</span> list:
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    encrypted <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, len(data), len(string_anchor)):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> data[i:i<span style="color:#f92672">+</span>len(string_anchor)] <span style="color:#f92672">==</span> string_anchor:
+</span></span><span style="display:flex;"><span>            bytes <span style="color:#f92672">=</span> extract_string(data[i:])
+</span></span><span style="display:flex;"><span>            encrypted<span style="color:#f92672">.</span>append(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> encrypted 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">extract</span>(path, string_anchor):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    encrypted <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">with</span> open(path, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>        data <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>        encrypted <span style="color:#f92672">=</span> find_encrypted(data, string_anchor)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; found </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> encrypted strings, decrypting&#34;</span><span style="color:#f92672">.</span>format(len(encrypted)))
+</span></span><span style="display:flex;"><span>    decrypted <span style="color:#f92672">=</span> map(decrypt, encrypted)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># search for URLS</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (ascii, wide) <span style="color:#f92672">in</span> decrypted:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ascii:
+</span></span><span style="display:flex;"><span>            x <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span><span style="color:#66d9ef">match</span>(REGEXP_URL, ascii)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> x:
+</span></span><span style="display:flex;"><span>                url <span style="color:#f92672">=</span> x[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>replace(<span style="color:#e6db74">&#39;.&#39;</span>, <span style="color:#e6db74">&#39;[.]&#39;</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>                print(<span style="color:#e6db74">&#34;[URL] </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(url))
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> wide:
+</span></span><span style="display:flex;"><span>            x <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span><span style="color:#66d9ef">match</span>(REGEXP_URL, wide)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> x:
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                url <span style="color:#f92672">=</span> x[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>replace(<span style="color:#e6db74">&#39;.&#39;</span>, <span style="color:#e6db74">&#39;[.]&#39;</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>                print(<span style="color:#e6db74">&#34;[URL] </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(url))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;../sample/805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7.exe&#34;</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; extracting path: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(path))
+</span></span><span style="display:flex;"><span>    extract(path, STRING_ANCHOR0)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;../sample/6091f2589fef42e0ab3d7975806cd8a0da012b519637c03b73f702f7586b21ef.exe&#34;</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; extracting path: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(path))
+</span></span><span style="display:flex;"><span>    extract(path, STRING_ANCHOR1)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;__main__&#39;</span>:
+</span></span><span style="display:flex;"><span>    main()
+</span></span></code></pre></div><p>The anchor can also be found automatically:</p>
+<pre tabindex="0"><code>&#34;&#34;&#34;
+automatically find the anchor for an unknown sample.
+&#34;&#34;&#34;
+def find_anchor(path):
+
+    data = []
+    with open(path, &#34;rb&#34;) as fp:
+        data = fp.read()
+
+    seq = list()
+
+    for i in range(0, len(data), 4):
+        if b&#34;\x00&#34; not in bytearray(data[i:i+4]):
+            seq.append(data[i:i+4])
+
+    seq = sorted(seq, key=seq.count, reverse=True)
+    return seq
+
+path = &#34;../sample/465f931e8a44b7f8dff8435255240b88f88f11e23bc73741b21c20be8673b6b7.exe&#34;
+print(&#34;&gt;&gt; extracting path: {}&#34;.format(path))
+anchor = find_anchor(path)
+</code></pre><p>Adding this to the config extraction above gives the following script:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-python" data-lang="python"><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">config extraction for sample 
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">SHA256: 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">the url of the C2 server is encrypted using some custom encryption algorithm
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">the malware resolves APIs by PEB walk and API hashing with CRC32 (0xEDB88320)
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">an encrypted string starts with &#34;0x7e 0xd0 0xdd 0xad&#34; and ends with &#34;0x00&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">we&#39;ll call the first 4 bytes the STRING_ANCHOR
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">import</span> re
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>STRING_ANCHOR0 <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;~</span><span style="color:#ae81ff">\xd0\xdd\xad</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>STRING_ANCHOR1 <span style="color:#f92672">=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;@</span><span style="color:#ae81ff">\x9d</span><span style="color:#e6db74">b3&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>REGEXP_URL <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&amp;+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">automatically find the anchor for an unknown sample.
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">find_anchor</span>(path):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    data <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">with</span> open(path, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>        data <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    seq <span style="color:#f92672">=</span> list()
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, len(data), <span style="color:#ae81ff">4</span>):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#34;</span> <span style="color:#f92672">not</span> <span style="color:#f92672">in</span> bytearray(data[i:i<span style="color:#f92672">+</span><span style="color:#ae81ff">4</span>]):
+</span></span><span style="display:flex;"><span>            seq<span style="color:#f92672">.</span>append(data[i:i<span style="color:#f92672">+</span><span style="color:#ae81ff">4</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    seq <span style="color:#f92672">=</span> sorted(seq, key<span style="color:#f92672">=</span>seq<span style="color:#f92672">.</span>count, reverse<span style="color:#f92672">=</span><span style="color:#66d9ef">True</span>)
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> seq
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">decrypt a string
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">decrypt</span>(encrypted):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    out <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    a0 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">0</span>:<span style="color:#ae81ff">4</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    a1 <span style="color:#f92672">=</span> int<span style="color:#f92672">.</span>from_bytes(encrypted[<span style="color:#ae81ff">4</span>:<span style="color:#ae81ff">8</span>], <span style="color:#e6db74">&#34;little&#34;</span>)
+</span></span><span style="display:flex;"><span>    length <span style="color:#f92672">=</span> (a0 <span style="color:#f92672">^</span> a1) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xffff</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    key <span style="color:#f92672">=</span> a0
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, length):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e"># in case we caught something that isn&#39;t a valid encrypted string</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> len(encrypted) <span style="color:#f92672">&lt;=</span> <span style="color:#ae81ff">6</span><span style="color:#f92672">+</span>i:
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">return</span> (<span style="color:#66d9ef">None</span>, <span style="color:#66d9ef">None</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>        val <span style="color:#f92672">=</span> encrypted[<span style="color:#ae81ff">6</span> <span style="color:#f92672">+</span> i]
+</span></span><span style="display:flex;"><span>        key <span style="color:#f92672">=</span> key <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>        out<span style="color:#f92672">.</span>append((val <span style="color:#f92672">^</span> key) <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xff</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># interpret as wide string</span>
+</span></span><span style="display:flex;"><span>    wide <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(out[i]) <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>,len(out),<span style="color:#ae81ff">2</span>)])
+</span></span><span style="display:flex;"><span>    ascii <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;&#34;</span><span style="color:#f92672">.</span>join([chr(byte) <span style="color:#66d9ef">for</span> byte <span style="color:#f92672">in</span> out])
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> (ascii, wide)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">once a string anchor is found, collect the encrypted string
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">extract_string</span>(data) <span style="color:#f92672">-&gt;</span> bytearray:
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>    bytes <span style="color:#f92672">=</span> bytearray()
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">while</span> data[i]<span style="color:#f92672">.</span>to_bytes() <span style="color:#f92672">!=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#34;</span>:
+</span></span><span style="display:flex;"><span>        bytes <span style="color:#f92672">+=</span> bytearray(data[i]<span style="color:#f92672">.</span>to_bytes())
+</span></span><span style="display:flex;"><span>        i <span style="color:#f92672">+=</span> <span style="color:#ae81ff">1</span>
+</span></span><span style="display:flex;"><span>    bytes <span style="color:#f92672">+=</span> <span style="color:#e6db74">b</span><span style="color:#e6db74">&#34;</span><span style="color:#ae81ff">\x00</span><span style="color:#e6db74">&#34;</span>
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> bytes
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">find string anchors and collecte encrypted strings
+</span></span></span><span style="display:flex;"><span><span style="color:#e6db74">&#34;&#34;&#34;</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">find_encrypted</span>(data, string_anchor) <span style="color:#f92672">-&gt;</span> list:
+</span></span><span style="display:flex;"><span>    
+</span></span><span style="display:flex;"><span>    encrypted <span style="color:#f92672">=</span> []
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(<span style="color:#ae81ff">0</span>, len(data), len(string_anchor)):
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> data[i:i<span style="color:#f92672">+</span>len(string_anchor)] <span style="color:#f92672">==</span> string_anchor:
+</span></span><span style="display:flex;"><span>            bytes <span style="color:#f92672">=</span> extract_string(data[i:])
+</span></span><span style="display:flex;"><span>            encrypted<span style="color:#f92672">.</span>append(bytes)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span> encrypted 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">extract</span>(path, string_anchor):
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    encrypted <span style="color:#f92672">=</span> <span style="color:#66d9ef">None</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">with</span> open(path, <span style="color:#e6db74">&#34;rb&#34;</span>) <span style="color:#66d9ef">as</span> fp:
+</span></span><span style="display:flex;"><span>        data <span style="color:#f92672">=</span> fp<span style="color:#f92672">.</span>read()
+</span></span><span style="display:flex;"><span>        encrypted <span style="color:#f92672">=</span> find_encrypted(data, string_anchor)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; found </span><span style="color:#e6db74">{}</span><span style="color:#e6db74"> encrypted strings, decrypting&#34;</span><span style="color:#f92672">.</span>format(len(encrypted)))
+</span></span><span style="display:flex;"><span>    decrypted <span style="color:#f92672">=</span> map(decrypt, encrypted)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e"># search for URLS</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span> (ascii, wide) <span style="color:#f92672">in</span> decrypted:
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> ascii:
+</span></span><span style="display:flex;"><span>            x <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span><span style="color:#66d9ef">match</span>(REGEXP_URL, ascii)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> x:
+</span></span><span style="display:flex;"><span>                url <span style="color:#f92672">=</span> x[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>replace(<span style="color:#e6db74">&#39;.&#39;</span>, <span style="color:#e6db74">&#39;[.]&#39;</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>                print(<span style="color:#e6db74">&#34;[URL] </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(url))
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> wide:
+</span></span><span style="display:flex;"><span>            x <span style="color:#f92672">=</span> re<span style="color:#f92672">.</span><span style="color:#66d9ef">match</span>(REGEXP_URL, wide)
+</span></span><span style="display:flex;"><span>            <span style="color:#66d9ef">if</span> x:
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>                url <span style="color:#f92672">=</span> x[<span style="color:#ae81ff">0</span>]<span style="color:#f92672">.</span>replace(<span style="color:#e6db74">&#39;.&#39;</span>, <span style="color:#e6db74">&#39;[.]&#39;</span>, <span style="color:#ae81ff">1</span>)
+</span></span><span style="display:flex;"><span>                print(<span style="color:#e6db74">&#34;[URL] </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(url))
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">def</span> <span style="color:#a6e22e">main</span>():
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;../sample/805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7.exe&#34;</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; extracting path: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(path))
+</span></span><span style="display:flex;"><span>    extract(path, STRING_ANCHOR0)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;../sample/6091f2589fef42e0ab3d7975806cd8a0da012b519637c03b73f702f7586b21ef.exe&#34;</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; extracting path: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(path))
+</span></span><span style="display:flex;"><span>    extract(path, STRING_ANCHOR1)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    path <span style="color:#f92672">=</span> <span style="color:#e6db74">&#34;../sample/465f931e8a44b7f8dff8435255240b88f88f11e23bc73741b21c20be8673b6b7.exe&#34;</span>
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; extracting path: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(path))
+</span></span><span style="display:flex;"><span>    anchor <span style="color:#f92672">=</span> find_anchor(path)
+</span></span><span style="display:flex;"><span>    print(<span style="color:#e6db74">&#34;&gt;&gt; found anchor: </span><span style="color:#e6db74">{}</span><span style="color:#e6db74">&#34;</span><span style="color:#f92672">.</span>format(anchor[<span style="color:#ae81ff">0</span>]))
+</span></span><span style="display:flex;"><span>    extract(path, anchor[<span style="color:#ae81ff">0</span>])
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">if</span> __name__ <span style="color:#f92672">==</span> <span style="color:#e6db74">&#39;__main__&#39;</span>:
+</span></span><span style="display:flex;"><span>    main()
+</span></span></code></pre></div><p>This yields:</p>
+<pre tabindex="0"><code>&gt;&gt; extracting path: ../sample/805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7.exe
+&gt;&gt; found 127 encrypted strings, decrypting
+[URL] https://titnovacrion[.]top/live/
+[URL] https://skinnyjeanso[.]com/live/
+&gt;&gt; extracting path: ../sample/6091f2589fef42e0ab3d7975806cd8a0da012b519637c03b73f702f7586b21ef.exe
+&gt;&gt; found 127 encrypted strings, decrypting
+[URL] https://titnovacrion[.]top/live/
+[URL] https://skinnyjeanso[.]com/live/
+&gt;&gt; extracting path: ../sample/465f931e8a44b7f8dff8435255240b88f88f11e23bc73741b21c20be8673b6b7.exe
+&gt;&gt; found anchor: b&#39;\x03a\x90\x8a&#39;
+&gt;&gt; found 127 encrypted strings, decrypting
+[URL] https://winarkamaps[.]com/live/
+[URL] https://stratimasesstr[.]com/live/
+</code></pre><h2 id="summary">Summary</h2>
+<p>The report provides string decryption, automatic detection of encrypted strings and
+the automatic extraction of the C2 URLs for the three analyzed samples.</p>
+<pre tabindex="0"><code>805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7
+6091f2589fef42e0ab3d7975806cd8a0da012b519637c03b73f702f7586b21ef
+465f931e8a44b7f8dff8435255240b88f88f11e23bc73741b21c20be8673b6b7
+</code></pre><p>0xca7</p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

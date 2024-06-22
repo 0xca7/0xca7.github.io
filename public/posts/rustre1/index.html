@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rust Reversing - Iterators | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Rust Reversing - Iterators</span></h1>
+
+<h2 class="date">2024/06/22</h2>
+</div>
+
+<main>
+<p><img src="/static/rre_small.png" alt="logo"></p>
+<h1 id="prerequisites">Prerequisites</h1>
+<p>I&rsquo;ll use Ghidra 11.0.2 for reversing, all binaries are built on Linux x86_64. Doesn&rsquo;t matter which disassembler you use, Binja, IDA, Ghidra, neither does the OS Windows, Linux or Mac, doesn&rsquo;t matter either. So, if you want to follow along, feel free to use any setup you want. It helps to know a bare minimum about Rust. If you don&rsquo;t, at least you should know C :)</p>
+<p>For cargo and rustc, I have the following versions:</p>
+<pre tabindex="0"><code>[~]$ cargo --version
+cargo 1.78.0 (54d8815d0 2024-03-26)
+[~]$ rustc --version
+rustc 1.78.0 (9b00956e5 2024-04-29)
+</code></pre><p>All prebuilt executables for this post can be found in my git repository <strong>rust-re</strong> (<a href="https://github.com/0xca7/rust-re">https://github.com/0xca7/rust-re</a>) in the <code>prebuilt</code> folder. I put them all in zip file <code>iterators_prebuilt.zip</code>.</p>
+<h1 id="introduction">Introduction</h1>
+<p>A common scheme you see in malware and firmware is XOR encryption. Although
+weak and sparking furious debates if it should even be called <em>encryption</em>,
+it is often used to make analysis harder/annoying. In malware it&rsquo;s often used to hide
+strings, in firmware I&rsquo;ve seen it used to encrypt whole blobs or even SPI
+communications.</p>
+<p>In it&rsquo;s simplest form you&rsquo;d see something like this in C:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">/**
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @brief decrypts/encrypts bytes in place
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param p a buffer holding bytes to decrypt/encrypt
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @param s the size of the buffer in bytes
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> * @return void
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"> */</span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span>
+</span></span><span style="display:flex;"><span><span style="color:#a6e22e">crypt_xor_in_place</span>(<span style="color:#66d9ef">uint8_t</span> <span style="color:#f92672">*</span>p, <span style="color:#66d9ef">size_t</span> s)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">size_t</span> i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">uint8_t</span> xor_key <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">for</span>(i <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>; i <span style="color:#f92672">&lt;</span> s; i<span style="color:#f92672">++</span>)
+</span></span><span style="display:flex;"><span>    {
+</span></span><span style="display:flex;"><span>        p[i] <span style="color:#f92672">^=</span> xor_key;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>The encrypted string goes in as <code>p</code> with size <code>s</code> and is decrypted in place.
+Seeing this in assembly corresponds pretty much to what you would expect.</p>
+<p>Let&rsquo;s do this in Rust now, with iterators.</p>
+<h1 id="rust-iterators">Rust Iterators</h1>
+<p>So, what is an iterator? If you ask Wikipedia, it says &ldquo;an object that enables
+a programmer to traverse a container&rdquo;. That about sums it up. For example, a
+container in Rust could be a simple vector, a slice, whatever.</p>
+<p>Here is how you <em>could</em> code the <code>crypt_xor_in_place</code> function in rust, with
+iterators:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">crypt</span>(data: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">mut</span> [<span style="color:#66d9ef">u8</span>]) {
+</span></span><span style="display:flex;"><span>    data
+</span></span><span style="display:flex;"><span>        .iter_mut()
+</span></span><span style="display:flex;"><span>        .for_each(<span style="color:#f92672">|</span>x<span style="color:#f92672">|</span> <span style="color:#f92672">*</span>x <span style="color:#f92672">^=</span> <span style="color:#ae81ff">0xde</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>I&rsquo;ll break what this function actually says, step-by-step:</p>
+<p><code>data: &amp;mut [u8]</code></p>
+<ul>
+<li>give me a slice <code>&amp;</code> of type <code>u8</code>.</li>
+<li>I want to be able to change the slice <code>&amp;mut</code></li>
+</ul>
+<p><code>data.iter_mut()</code></p>
+<ul>
+<li>give me an iterator of <code>data</code>, where I can change the elements contained in
+<code>data</code> (<code>iter_mut</code> yields the mutable iterator)</li>
+</ul>
+<p><code>data.iter_mut().for_each( f )</code></p>
+<ul>
+<li>now that we have a mutable iterator, we apply a function <code>f</code> to each element
+in the iterator (<code>for_each</code>), this function can change the element because
+of <code>iter_mut</code></li>
+</ul>
+<p><code>|x| *x ^= 0xde</code></p>
+<ul>
+<li>this is a <em>closure</em> passed to <code>for_each</code>, it&rsquo;s the function that will be
+applied.</li>
+<li>we call an element of <code>data</code> by the name <code>x</code></li>
+<li><code>x</code> is a reference to a <code>u8</code>, thus <code>&amp;u8</code>, that&rsquo;s we we need to dereference
+with <code>*x</code> to actually make the change.</li>
+<li>the change is just: <code>x = x XOR 0xde</code></li>
+</ul>
+<p>Doing the encryption like this is functional programming approach that is common in Rust. Instead of using a for loop, you can do this. Generally, when I code rust, I mostly take this approach, it&rsquo;s just more comfy.</p>
+<h1 id="reverse-engineering">Reverse Engineering</h1>
+<p>I compiled two versions, a <code>debug</code> and a <code>release</code> build. The debug build
+contains symbols, names and everything else you want to have from debug build.</p>
+<p>For the <code>release</code> build, I specified it should be stripped [1]. This is the
+build that you&rsquo;d actually ship.</p>
+<p>Now here&rsquo;s a little catch: When you build your Rust project with <code>cargo build</code> you get the debug build, not the release build. As such, it can happen that you get hold of a debug binary instead of a release binary. I will cover both cases.</p>
+<h2 id="debug-build">Debug Build</h2>
+<p>In the debug build, Ghidra will show pretty much everything you want to know. Finding the main function is also no problem. In the symbol tree, you can find <code>crypt::crypt::main</code> under <code>Namespaces</code>. The only thing that is interesting to us is <code>crypt::crypt::crypt</code>. You get there via <code>Namespaces</code> or by the call in <code>crypt::crypt::main</code>.</p>
+<p>Here&rsquo;s the disassembly of <code>crypt::crypt::crypt</code>:</p>
+<pre tabindex="0"><code>                    ********************************************
+                    * DWARF original prototype: void crypt(... *
+                    ********************************************
+                    char * __rustcall crypt(char * __key, c
+         char *       RAX:8     &lt;RETURN&gt;
+         char *       RDI:8     __key
+         char *       RSI:8     __salt
+         undefined8   Stack[-0x local_8                     XREF[1]: 00108f29(W)  
+         undefined8   Stack[-0x local_10                    XREF[1]: 00108f24(W)  
+                    _ZN5crypt5crypt17h9a2969e463138a  XREF[4]: main:00108fe7(c), 
+                    crypt::crypt::crypt                        main:00109225(c), 
+                                                               0014ebf8, 0014fde8(*)  
+   00108f20 48 83      SUB     RSP,0x18
+            ec 18
+                       // save first argument = data_ptr
+   00108f24 48 89      MOV     qword ptr [RSP + local_10],RDI
+            7c 24 08
+                       // save second argument = data_length
+   00108f29 48 89      MOV     qword ptr [RSP + local_8],RSI
+            74 24 10
+                       // create a mutable iterator from the slice passed in
+   00108f2e e8 1d      CALL    core::slice::iter_mut&lt;u8&gt;         IterMut&lt;u8&gt; iter_mut&lt;u
+            f7 ff ff
+   00108f33 48 89 c7   MOV     RDI,RAX
+   00108f36 48 89 d6   MOV     RSI,RDX
+                       // iterate and apply the closure for each element in the iterator
+   00108f39 e8 a2      CALL    core::slice::iter::for_each&lt;&gt;     void for_each&lt;u8,_cryp
+            15 00 00
+   00108f3e 48 83      ADD     RSP,0x18
+            c4 18
+   00108f42 c3         RET
+</code></pre><p>The decompiler does a good job here:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span> __rustcall crypt<span style="color:#f92672">::</span>crypt<span style="color:#f92672">::</span><span style="color:#a6e22e">crypt</span>(<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>__key,<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>__salt)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>pcVar1;
+</span></span><span style="display:flex;"><span>  IterMut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> IVar2;
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&amp;</span>mut_[u8] self;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  self.length <span style="color:#f92672">=</span> (usize)__salt;
+</span></span><span style="display:flex;"><span>  self.data_ptr <span style="color:#f92672">=</span> (u8 <span style="color:#f92672">*</span>)__key;
+</span></span><span style="display:flex;"><span>  IVar2 <span style="color:#f92672">=</span> core<span style="color:#f92672">::</span>slice<span style="color:#f92672">::</span>iter_mut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span>(self);
+</span></span><span style="display:flex;"><span>  pcVar1 <span style="color:#f92672">=</span> (<span style="color:#66d9ef">char</span> <span style="color:#f92672">*</span>)core<span style="color:#f92672">::</span>slice<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>for_each<span style="color:#f92672">&lt;&gt;</span>(IVar2.ptr.pointer,IVar2.end_or_len);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> pcVar1;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>So, <code>IVar2</code> is the mutable iterator. Our data length is called <code>salt</code> for some reason, <code>key</code> is the data pointer.
+The slice <code>&amp;mut [u8]</code> consists of a length and a pointer to the data, as one would expect [2].</p>
+<p>Now, where is the XOR operation? It can be found inside of <code>core::slice::iter::for_each&lt;&gt;</code>. Let&rsquo;s look inside:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall core<span style="color:#f92672">::</span>slice<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>for_each<span style="color:#f92672">&lt;&gt;</span>(u8 <span style="color:#f92672">*</span>param_1,u8 <span style="color:#f92672">*</span>param_2)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>x;
+</span></span><span style="display:flex;"><span>  IterMut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> local_40;
+</span></span><span style="display:flex;"><span>  {closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} local_29;
+</span></span><span style="display:flex;"><span>  Option<span style="color:#f92672">&lt;&amp;</span>mut_u8<span style="color:#f92672">&gt;</span> local_28;
+</span></span><span style="display:flex;"><span>  Option<span style="color:#f92672">&lt;&amp;</span>mut_u8<span style="color:#f92672">&gt;</span> local_20;
+</span></span><span style="display:flex;"><span>  Option<span style="color:#f92672">&lt;&amp;</span>mut_u8<span style="color:#f92672">&gt;</span> local_8;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  local_40.ptr.pointer <span style="color:#f92672">=</span> param_1;
+</span></span><span style="display:flex;"><span>  local_40.end_or_len <span style="color:#f92672">=</span> param_2;
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 0010a4ee to 0010a4f7 has its CatchHandler @ 0010a508 */</span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> (local_28 <span style="color:#f92672">=</span> next<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span>(<span style="color:#f92672">&amp;</span>local_40), local_28 <span style="color:#f92672">!=</span> (Option<span style="color:#f92672">&lt;&amp;</span>mut_u8<span style="color:#f92672">&gt;</span>)<span style="color:#ae81ff">0x0</span>) {
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 0010a54f to 0010a558 has its CatchHandler @ 0010a508 */</span>
+</span></span><span style="display:flex;"><span>    local_20 <span style="color:#f92672">=</span> local_28;
+</span></span><span style="display:flex;"><span>    local_8 <span style="color:#f92672">=</span> local_28;
+</span></span><span style="display:flex;"><span>    crypt<span style="color:#f92672">::</span>crypt<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}(<span style="color:#f92672">&amp;</span>local_29,(u8 <span style="color:#f92672">*</span>)local_28);
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We&rsquo;ll break it down:</p>
+<ul>
+<li><code>local_28</code> is the next element in the iterator. You can see this because of <code>local_28 = next&lt;u8&gt;</code></li>
+<li>when an iterator has no next element, that is, the iterator reached the end, it will return <code>None</code></li>
+</ul>
+<p>You might find <code>None</code> being something you are not familiar with. To explain what <code>None</code> is, we first need to understand the <code>enum</code> type in Rust. This type can be used just like a C enum, but I can do a lot more. In C, you would have something like:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">enum</span> Level {
+</span></span><span style="display:flex;"><span>  LOW,
+</span></span><span style="display:flex;"><span>  MEDIUM,
+</span></span><span style="display:flex;"><span>  HIGH
+</span></span><span style="display:flex;"><span>};
+</span></span></code></pre></div><p>In Rust, you can, among other things, assign values to enum items. For example:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">pub</span> <span style="color:#66d9ef">enum</span> Option<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    None,
+</span></span><span style="display:flex;"><span>    Some(T),
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Here, <code>T</code> describes the type, for example, we could have <code>Option&lt;String&gt;</code>, <code>Option&lt;u32&gt;</code>, etc. The enum you can see above is the <code>Option</code> enum, a standard enum that comes with Rust. You can find this everywhere in Rust programs. In the case of the iterator, if the iterator can return a value (there is a <em>next</em> element), it will return <code>Some(T)</code>. The <code>Some</code> tells us that we got <em>some</em> value back. If the iterator is not able to yield anymore items, for example, if a list is iterated and the end is reached, we would get <code>None</code> back.</p>
+<ul>
+<li>the <code>local_28 != (Option&lt;&amp;mut u8&gt;0x0)</code> checks if the next element is <code>None</code>, this serves to determine when to stop looping with <code>while</code>.</li>
+</ul>
+<p>Our actual call to the closure which applies the XOR operation to an element is in <code>crypt::crypt::{closure#0}</code>.
+Inside here, we find the XOR operation applied to an element <code>x</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall crypt<span style="color:#f92672">::</span>crypt<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}({closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>param_1,u8 <span style="color:#f92672">*</span>x)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  {closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>param_0<span style="color:#f92672">-</span>local;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>x<span style="color:#f92672">-</span>local;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">*</span>x <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>x <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>As you can see from this, we can drill down into the debug build the find the operation applied to each element of the slice. From this, it&rsquo;s easy to understand what is happening and we can deduce that we&rsquo;re dealing with XOR encryption.</p>
+<p>Don&rsquo;t worry, we&rsquo;ll cover a more complicated case later :)</p>
+<h2 id="release-build">Release Build</h2>
+<p>I&rsquo;m not gonna cover how to find the main. If you&rsquo;re following along, it&rsquo;s here: <code>0x00108720</code>.</p>
+<p>Here, it gets interesting:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#f92672">---</span> SNIP <span style="color:#f92672">---</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#a6e22e">FUN_0011fd70</span>(<span style="color:#f92672">&amp;</span>local_90,<span style="color:#e6db74">&#34;plaintext.txt&#34;</span>,<span style="color:#ae81ff">0xd</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">if</span> (local_90 <span style="color:#f92672">==</span> (undefined4 <span style="color:#f92672">*</span>)<span style="color:#ae81ff">0x8000000000000000</span>) {
+</span></span><span style="display:flex;"><span>    local_d8 <span style="color:#f92672">=</span> uStack_88;
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 00108ad6 to 00108af8 has its CatchHandler @ 00108b62 */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">FUN_001082b0</span>(<span style="color:#e6db74">&#34;failed to read data&#34;</span>,<span style="color:#ae81ff">0x13</span>,<span style="color:#f92672">&amp;</span>local_d8,<span style="color:#f92672">&amp;</span>PTR_FUN_001552c8,<span style="color:#f92672">&amp;</span>PTR_s_src<span style="color:#f92672">/</span>main.rs_001552e8)
+</span></span><span style="display:flex;"><span>    ;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">goto</span> LAB_00108b27;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  local_48 <span style="color:#f92672">=</span> (ulong)local_80;
+</span></span><span style="display:flex;"><span>  local_58 <span style="color:#f92672">=</span> (undefined4)local_90;
+</span></span><span style="display:flex;"><span>  uStack_54 <span style="color:#f92672">=</span> local_90._4_4_;
+</span></span><span style="display:flex;"><span>  uStack_50 <span style="color:#f92672">=</span> (undefined4)uStack_88;
+</span></span><span style="display:flex;"><span>  uStack_4c <span style="color:#f92672">=</span> uStack_88._4_4_;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (local_80 <span style="color:#f92672">!=</span> (undefined4 <span style="color:#f92672">***</span>)<span style="color:#ae81ff">0x0</span>) {
+</span></span><span style="display:flex;"><span>    ppuVar10 <span style="color:#f92672">=</span> uStack_88;
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// [TAG#3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">if</span> (<span style="color:#ae81ff">7</span> <span style="color:#f92672">&lt;</span> local_80) {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (local_80 <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0x20</span>) {
+</span></span><span style="display:flex;"><span>        uVar9 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>        uVar9 <span style="color:#f92672">=</span> (ulong)local_80 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xffffffffffffffe0</span>;
+</span></span><span style="display:flex;"><span>        uVar11 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>          <span style="color:#75715e">// [TAG#5]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>          puVar1 <span style="color:#f92672">=</span> (ulong <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar11);
+</span></span><span style="display:flex;"><span>          puVar2 <span style="color:#f92672">=</span> (ulong <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar11 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>);
+</span></span><span style="display:flex;"><span>          uVar7 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(uint <span style="color:#f92672">*</span>)(puVar2 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>          uVar8 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(uint <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)puVar2 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xc</span>);
+</span></span><span style="display:flex;"><span>          auVar4._8_4_ <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(uint <span style="color:#f92672">*</span>)(puVar1 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>) <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededede</span>;
+</span></span><span style="display:flex;"><span>          auVar4._0_8_ <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededededededede</span>;
+</span></span><span style="display:flex;"><span>          auVar4._12_4_ <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(uint <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)puVar1 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0xc</span>) <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededede</span>;
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">*</span>(<span style="color:#a6e22e">undefined</span> (<span style="color:#f92672">*</span>) [<span style="color:#ae81ff">16</span>])((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar11) <span style="color:#f92672">=</span> auVar4;
+</span></span><span style="display:flex;"><span>          auVar6._8_4_ <span style="color:#f92672">=</span> uVar7 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededede</span>;
+</span></span><span style="display:flex;"><span>          auVar6._0_8_ <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>puVar2 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededededededede</span>;
+</span></span><span style="display:flex;"><span>          auVar6._12_4_ <span style="color:#f92672">=</span> uVar8 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededede</span>;
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">*</span>(<span style="color:#a6e22e">undefined</span> (<span style="color:#f92672">*</span>) [<span style="color:#ae81ff">16</span>])((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar11 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>) <span style="color:#f92672">=</span> auVar6;
+</span></span><span style="display:flex;"><span>          uVar11 <span style="color:#f92672">=</span> uVar11 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x20</span>;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">while</span> (uVar9 <span style="color:#f92672">!=</span> uVar11);
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (local_80 <span style="color:#f92672">==</span> (undefined4 <span style="color:#f92672">***</span>)uVar9) <span style="color:#66d9ef">goto</span> LAB_0010881b;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">if</span> (((ulong)local_80 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0x18</span>) <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>          ppuVar10 <span style="color:#f92672">=</span> (undefined <span style="color:#f92672">**</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar9);
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">goto</span> LAB_0010880a;
+</span></span><span style="display:flex;"><span>        }
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// [TAG#4]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      uVar11 <span style="color:#f92672">=</span> (ulong)local_80 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xfffffffffffffff8</span>;
+</span></span><span style="display:flex;"><span>      ppuVar10 <span style="color:#f92672">=</span> (undefined <span style="color:#f92672">**</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar11);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span>(ulong <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar9) <span style="color:#f92672">=</span>
+</span></span><span style="display:flex;"><span>             <span style="color:#f92672">*</span>(ulong <span style="color:#f92672">*</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> uVar9) <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededededededede</span>;
+</span></span><span style="display:flex;"><span>        uVar9 <span style="color:#f92672">=</span> uVar9 <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>;
+</span></span><span style="display:flex;"><span>      } <span style="color:#66d9ef">while</span> (uVar11 <span style="color:#f92672">!=</span> uVar9);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (local_80 <span style="color:#f92672">==</span> (undefined4 <span style="color:#f92672">***</span>)uVar11) <span style="color:#66d9ef">goto</span> LAB_0010881b;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>LAB_0010880a:
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// [TAG#3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">*</span>(byte <span style="color:#f92672">*</span>)ppuVar10 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(byte <span style="color:#f92672">*</span>)ppuVar10 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>      ppuVar10 <span style="color:#f92672">=</span> (undefined <span style="color:#f92672">**</span>)((<span style="color:#66d9ef">long</span>)ppuVar10 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>);
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">while</span> (ppuVar10 <span style="color:#f92672">!=</span> (undefined <span style="color:#f92672">**</span>)((<span style="color:#66d9ef">long</span>)uStack_88 <span style="color:#f92672">+</span> (<span style="color:#66d9ef">long</span>)local_80));
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>LAB_0010881b:
+</span></span><span style="display:flex;"><span><span style="color:#f92672">---</span> SNIP <span style="color:#f92672">---</span>
+</span></span></code></pre></div><p>To break this down, I&rsquo;ll add tags to the above in the form: <code>// [TAG#x]</code>.</p>
+<p>The program reads a file <code>plaintext.txt</code>, in addition to the file name, the length of the file name <code>0xd</code> is passed to the reader function. The first parameter is <code>local_90</code> <code>[TAG#0]</code>. This is checked for an error return <code>[TAG#1]</code>. Next, we have a sequence of assignments <code>[TAG#2]</code>. From the context, you can clearly see that <code>local_80</code> must be the length of the vector that was read (<code>local_80</code> is continuously checked against integers values).</p>
+<p>The length is used to determine how to process the data with the XOR operation.</p>
+<ul>
+<li><code>[TAG#3]</code> will be executed when the length of the vector is less or equal 7 bytes. It will also be executed for remaining bytes.</li>
+<li><code>[TAG#4]</code> handles the case where we have less than 32 bytes or we have more than 32 bytes and a remainder.</li>
+<li><code>[TAG#5]</code> is the case when we have greater or equal 32 bytes</li>
+</ul>
+<p>You get the idea. The XOR encryption was optimized. The important thing to note here is that the iterator is gone. You can&rsquo;t see it in the disassembler. Instead, you get optimized loops for different lengths of the input to process. There is no function call to <code>crypt</code> anymore. It&rsquo;s all in the main.</p>
+<h1 id="another-algorithm">Another Algorithm</h1>
+<p>The next algorithm does a little more than just a byte-wise XOR. I uses a counter value that is also processed. As pseudocode:</p>
+<pre tabindex="0"><code>for i in 0..length 
+do
+  data[i] = data[i] ^ XOR_KEY ^ (i MOD 256)
+end for
+</code></pre><p>In Rust we can do it like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">fn</span> <span style="color:#a6e22e">crypt_counter</span>(data: <span style="color:#66d9ef">&amp;</span><span style="color:#a6e22e">mut</span> [<span style="color:#66d9ef">u8</span>]) {
+</span></span><span style="display:flex;"><span>    data
+</span></span><span style="display:flex;"><span>        .iter_mut()
+</span></span><span style="display:flex;"><span>        .enumerate()
+</span></span><span style="display:flex;"><span>        .for_each(<span style="color:#f92672">|</span>(i, x)<span style="color:#f92672">|</span> <span style="color:#f92672">*</span>x <span style="color:#f92672">^=</span> <span style="color:#ae81ff">0xde</span> <span style="color:#f92672">^</span> i <span style="color:#66d9ef">as</span> <span style="color:#66d9ef">u8</span>);
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Pretty similar to what we had before. The only thing that changed is the <code>enumerate()</code> before <code>for_each</code>, which results in <code>for_each</code> now having a tuple as an argument. So, the closure now receives a counter value <code>i</code>, that is the index of <code>x</code> in <code>data</code>, as an addition. The operation applied to <code>data</code> corresponds to what we defined in the pseudocode.</p>
+<h2 id="reversing-the-debug-version">Reversing the Debug Version</h2>
+<p>Let&rsquo;s start off with the debug version and check out the new function. We can use the namespaces in the symbol tree to find the function we want to analyze as before. Here, we can find <code>crypt_counter::crypt_counter::main</code>. You can clearly see the call to the <code>crypt_counter::crypt_counter::cryptcounter</code> function we are interested in. Here, is the inside of that function, as supplied by Ghidra&rsquo;s decompiler:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall crypt_counter<span style="color:#f92672">::</span>crypt_counter<span style="color:#f92672">::</span><span style="color:#a6e22e">crypt_counter</span>(<span style="color:#f92672">&amp;</span>mut_[u8] data)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  IterMut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> self;
+</span></span><span style="display:flex;"><span>  Enumerate<span style="color:#f92672">&lt;&gt;</span> EStack_28;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_10;
+</span></span><span style="display:flex;"><span>  usize local_8;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  local_8 <span style="color:#f92672">=</span> data.length;
+</span></span><span style="display:flex;"><span>  local_10 <span style="color:#f92672">=</span> data.data_ptr;
+</span></span><span style="display:flex;"><span>  self <span style="color:#f92672">=</span> core<span style="color:#f92672">::</span>slice<span style="color:#f92672">::</span>iter_mut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span>(data); <span style="color:#75715e">// [TAG#0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>traits<span style="color:#f92672">::</span>iterator<span style="color:#f92672">::</span>Iterator<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">&lt;&gt;</span>(<span style="color:#f92672">&amp;</span>EStack_28,self); <span style="color:#75715e">// [TAG#1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>traits<span style="color:#f92672">::</span>iterator<span style="color:#f92672">::</span>Iterator<span style="color:#f92672">::</span>for_each<span style="color:#f92672">&lt;&gt;</span>(<span style="color:#f92672">&amp;</span>EStack_28);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>We can see the added <code>enumerate()</code> (<code>[TAG#1]</code>). This tells us that we have a counter, corresponding to the element inside <code>data</code> and a tuple argument in the closure of <code>for_each()</code>. We know that the corresponding element must be of type <code>u8</code> from <code>[TAG#0]</code>. When we start digging into <code>for_each</code>, we need to be aware of this.</p>
+<p>Inside <code>for_each</code> we get this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>undefined8 __rustcall core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>traits<span style="color:#f92672">::</span>iterator<span style="color:#f92672">::</span>Iterator<span style="color:#f92672">::</span>for_each<span style="color:#f92672">&lt;&gt;</span>(<span style="color:#66d9ef">void</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  undefined8 in_RAX;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  adapters<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>fold<span style="color:#f92672">&lt;&gt;</span>();
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> in_RAX;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Now that&rsquo;s different from what we saw before. There is a call to <code>fold()</code>. Again, something we know from functional programming. A fold is described in [3][4], if you don&rsquo;t know what fold does, here&rsquo;s a quick explanation:</p>
+<ul>
+<li>fold can transform a collection into a single value.</li>
+<li>to use fold, we need three things: an initial value, a collection and a function.</li>
+<li>a fold holds something called an <code>accumulator</code>. the initial value is the starting value of the accumulator.</li>
+<li>the function returns a value of the type that is iterated.</li>
+<li>a simple example: calculate a sum</li>
+</ul>
+<pre tabindex="0"><code>// calculate the sum of 1,2,3,4
+// initial value for the accumulator: 0
+// function to apply: |acc, num| acc + num (acc is the accumulator)
+// collection: range of numbers 1..4
+let sum = (1..=4).fold(0, |acc, x| { acc + x });
+</code></pre><p>Imagine we just ignore the accumulator. Then we can do our encryption like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span>data
+</span></span><span style="display:flex;"><span>  .iter_mut()
+</span></span><span style="display:flex;"><span>  .enumerate()
+</span></span><span style="display:flex;"><span>  .fold(<span style="color:#ae81ff">0</span>, <span style="color:#f92672">|</span>acc, (i, x)<span style="color:#f92672">|</span> { <span style="color:#f92672">*</span>x <span style="color:#f92672">^=</span> <span style="color:#ae81ff">0xde</span> <span style="color:#f92672">^</span> i <span style="color:#66d9ef">as</span> <span style="color:#66d9ef">u8</span>; <span style="color:#ae81ff">0</span> } );
+</span></span></code></pre></div><p>Which is equivalent to using <code>for_each</code>. Now we can see why we have a <code>fold</code> here.
+Let&rsquo;s continue.</p>
+<p>Into <code>fold</code> we go! We see this, there is some data being passed in:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall
+</span></span><span style="display:flex;"><span>core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>adapters<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>fold<span style="color:#f92672">&lt;&gt;</span>
+</span></span><span style="display:flex;"><span>          (IterMut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> <span style="color:#f92672">*</span>self,undefined8 param_2,undefined8 param_3,{closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span> param_4)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  slice<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>fold<span style="color:#f92672">&lt;&gt;</span>(<span style="color:#f92672">*</span>self,(<span style="color:#66d9ef">char</span>)self[<span style="color:#ae81ff">1</span>].ptr.pointer,param_4);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>&hellip; one layer below that, again, going into <code>fold</code>:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall core<span style="color:#f92672">::</span>slice<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>fold<span style="color:#f92672">&lt;&gt;</span>(IterMut<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> self,undefined init,{closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span> f)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  undefined7 in_register_00000011;
+</span></span><span style="display:flex;"><span>  usize rhs;
+</span></span><span style="display:flex;"><span>  NonNull<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> end_1;
+</span></span><span style="display:flex;"><span>  usize i;
+</span></span><span style="display:flex;"><span>  usize len;
+</span></span><span style="display:flex;"><span>  () acc;
+</span></span><span style="display:flex;"><span>  NonNull<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> end;
+</span></span><span style="display:flex;"><span>  NonNull<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> local_b8;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_b0;
+</span></span><span style="display:flex;"><span>  undefined8 local_a8;
+</span></span><span style="display:flex;"><span>  undefined local_99;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_98;
+</span></span><span style="display:flex;"><span>  usize local_90;
+</span></span><span style="display:flex;"><span>  usize local_88;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_80;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_78;
+</span></span><span style="display:flex;"><span>  undefined local_6c;
+</span></span><span style="display:flex;"><span>  undefined local_6b;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">**</span>local_68;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">**</span>local_60;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">**</span>local_58;
+</span></span><span style="display:flex;"><span>  NonNull<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> local_50;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_48;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">**</span>local_40;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_38;
+</span></span><span style="display:flex;"><span>  NonNull<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span> local_30;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>local_18;
+</span></span><span style="display:flex;"><span>  usize local_10;
+</span></span><span style="display:flex;"><span>  usize local_8;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  local_b0 <span style="color:#f92672">=</span> self.end_or_len;
+</span></span><span style="display:flex;"><span>  local_b8 <span style="color:#f92672">=</span> self.ptr;
+</span></span><span style="display:flex;"><span>  local_a8 <span style="color:#f92672">=</span> <span style="color:#a6e22e">CONCAT71</span>(in_register_00000011,init);
+</span></span><span style="display:flex;"><span>  local_68 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_b0;
+</span></span><span style="display:flex;"><span>  local_60 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_b8.pointer;
+</span></span><span style="display:flex;"><span>  local_58 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_98;
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  local_99 <span style="color:#f92672">=</span> local_b8.pointer <span style="color:#f92672">==</span> local_b0;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#f92672">!</span>(<span style="color:#66d9ef">bool</span>)local_99) {
+</span></span><span style="display:flex;"><span>    local_6b <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    local_6c <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    local_90 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    local_40 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_b0;
+</span></span><span style="display:flex;"><span>    local_98 <span style="color:#f92672">=</span> local_b0;
+</span></span><span style="display:flex;"><span>    local_50.pointer <span style="color:#f92672">=</span> local_b8.pointer;
+</span></span><span style="display:flex;"><span>    local_48 <span style="color:#f92672">=</span> local_b0;
+</span></span><span style="display:flex;"><span>    local_38 <span style="color:#f92672">=</span> local_b0;
+</span></span><span style="display:flex;"><span>    local_30.pointer <span style="color:#f92672">=</span> local_b8.pointer;
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 001093eb to 00109461 has its CatchHandler @ 00109406 */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// [TAG#2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    local_88 <span style="color:#f92672">=</span> ptr<span style="color:#f92672">::</span>const_ptr<span style="color:#f92672">::</span>sub_ptr<span style="color:#f92672">&lt;</span>u8<span style="color:#f92672">&gt;</span>(local_b0,local_b8.pointer);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>      local_6c <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      local_18 <span style="color:#f92672">=</span> local_b8.pointer;
+</span></span><span style="display:flex;"><span>      local_10 <span style="color:#f92672">=</span> local_90;
+</span></span><span style="display:flex;"><span>      local_80 <span style="color:#f92672">=</span> local_b8.pointer <span style="color:#f92672">+</span> local_90;
+</span></span><span style="display:flex;"><span>      local_78 <span style="color:#f92672">=</span> local_80;
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// [TAG#3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>adapters<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>fold<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span>((<span style="color:#66d9ef">char</span>)<span style="color:#f92672">&amp;</span>local_a8,local_80); <span style="color:#75715e">// [TAG#0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      local_8 <span style="color:#f92672">=</span> local_90;
+</span></span><span style="display:flex;"><span>      local_90 <span style="color:#f92672">=</span> local_90 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">while</span> (local_90 <span style="color:#f92672">!=</span> local_88);
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Now we finally see our closure! I marked it with <code>[TAG#0]</code> in the listing above. Before we get into the closure itself, let&rsquo;s spend some more time figuring out what is going on. At <code>[TAG#1]</code>, the pointer to the data is checked. If it has reached the end of the data (condition <code>local_99</code> evaluates to true), we&rsquo;re done. In any other case, iteration starts. The variable <code>local_90</code> is just a counter. This is compared in the while loop with <code>local_88</code>, which is just the number of elements in the collection we&rsquo;re iterating. You can see this from <code>[TAG#2]</code>. Here, <code>sub_ptr</code> is used to calculate the distance between the end of the collection and the current pointer, which will point to the first element.</p>
+<p>The actual calculation is done in the closure at <code>[TAG#3]</code>. The arguments to this are <code>local_80</code>, which is the current element. The first argument, <code>local_a8</code> is most likely the accumulator, initialized to an initialization value at the start of the function. We don&rsquo;t care about the initialization value.</p>
+<p>Next, we get into the closure <code>core::iter::adapters::enumerate::fold::enumerate::{closure#0}&lt;&gt;(..)</code>. I will expand the other nested functions as well below, to get a better overview.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>adapters<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>fold<span style="color:#f92672">::</span>enumerate<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span>(<span style="color:#66d9ef">char</span> acc,u8 <span style="color:#f92672">*</span>item)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  (usize,_<span style="color:#f92672">&amp;</span>mut_u8) item_00;
+</span></span><span style="display:flex;"><span>  undefined7 in_register_00000039;
+</span></span><span style="display:flex;"><span>  usize <span style="color:#f92672">*</span>puVar1;
+</span></span><span style="display:flex;"><span>  usize <span style="color:#f92672">*</span>count;
+</span></span><span style="display:flex;"><span>  () acc_1;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  puVar1 <span style="color:#f92672">=</span> (usize <span style="color:#f92672">*</span>)<span style="color:#a6e22e">CONCAT71</span>(in_register_00000039,acc);
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  item_00.__1 <span style="color:#f92672">=</span> item;
+</span></span><span style="display:flex;"><span>  item_00.__0 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>puVar1;
+</span></span><span style="display:flex;"><span>  traits<span style="color:#f92672">::</span>iterator<span style="color:#f92672">::</span>Iterator<span style="color:#f92672">::</span>for_each<span style="color:#f92672">::</span>call<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span>(acc <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x8</span>,item_00);
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// #[TAG#2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#66d9ef">if</span> (<span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0xffffffffffffffff</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>puVar1 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 00108737 to 00108752 has its CatchHandler @ 0010875f */</span>
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* WARNING: Subroutine does not return */</span>
+</span></span><span style="display:flex;"><span>  panicking<span style="color:#f92672">::</span><span style="color:#a6e22e">panic</span>();
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall
+</span></span><span style="display:flex;"><span>core<span style="color:#f92672">::</span>iter<span style="color:#f92672">::</span>traits<span style="color:#f92672">::</span>iterator<span style="color:#f92672">::</span>Iterator<span style="color:#f92672">::</span>for_each<span style="color:#f92672">::</span>call<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}<span style="color:#f92672">&lt;&gt;</span>
+</span></span><span style="display:flex;"><span>          (undefined param_1,(usize,_<span style="color:#f92672">&amp;</span>mut_u8) item)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  undefined7 in_register_00000039;
+</span></span><span style="display:flex;"><span>  {closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>f;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  crypt_counter<span style="color:#f92672">::</span>crypt_counter<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}
+</span></span><span style="display:flex;"><span>            (({closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>)<span style="color:#a6e22e">CONCAT71</span>(in_register_00000039,param_1),item);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> __rustcall
+</span></span><span style="display:flex;"><span>crypt_counter<span style="color:#f92672">::</span>crypt_counter<span style="color:#f92672">::</span>{closure<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>}({closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>param_1,(usize,_<span style="color:#f92672">&amp;</span>mut_u8) param_2)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  {closure_env<span style="color:#960050;background-color:#1e0010">#</span><span style="color:#ae81ff">0</span>} <span style="color:#f92672">*</span>param_0<span style="color:#f92672">-</span>local;
+</span></span><span style="display:flex;"><span>  (usize,_<span style="color:#f92672">&amp;</span>mut_u8) param_1<span style="color:#f92672">-</span>local;
+</span></span><span style="display:flex;"><span>  usize i;
+</span></span><span style="display:flex;"><span>  u8 <span style="color:#f92672">*</span>x;
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#4]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#f92672">*</span>param_2.__1 <span style="color:#f92672">=</span> param_2.__0 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span> <span style="color:#f92672">^</span> <span style="color:#f92672">*</span>param_2.__1;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Now, we can get a better picture of what is happening. Our tuple of the index and the current element is at <code>[TAG#0]</code>. As expected, the tuple passed to the function is in <code>item00.__1</code> that is the <code>u8</code> in the tuple. The current index, <code>item00.__0</code> is <code>puVar1</code> - the accumulator - and incremented after the <code>for_each</code> call at <code>[TAG#2]</code>. This is an argument for the function <code>core::iter::traits::iterator::Iterator::for_each::call::{closure#0}</code>. Inside here, at <code>[TAG#3]</code>, is the final call down to the actual logic inside the closure <code>crypt_counter::crypt_counter::{closure#0}</code>. After following all nested functions, we finally see <code>*x = *x ^ 0xde ^ i</code> at <code>[TAG#4]</code>.</p>
+<p>As you can see, it&rsquo;s possible to follow what is happening in the debug version, but lots if nesting makes it convoluted and a harder to follow what is going on. Currently, there is still something missing in my understanding: why is <code>0x8</code> added to <code>acc</code> in the parameter to the <code>for_each</code> call? One reason for that might be that <code>acc</code> is a structure, consisting of multiple members, thus the offset will access a certain member. Also, notice that this value, <code>acc+0x8</code> is not actually used inside of <code>crypt_counter::crypt_counter::{closure#0}</code>. However, the accumulator <code>acc</code> is incremented to store the current index. I think with this we can safely say that we can see the XOR operation with the index <code>i</code> applied to the data in the iterator, giving us an understanding to reverse the encryption.</p>
+<p>Let&rsquo;s move on to the release version.</p>
+<h2 id="reversing-the-release-version">Reversing the Release Version</h2>
+<p>This time, I will post the full main function decompiled by Ghidra:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#a6e22e">FUN_00108700</span>(<span style="color:#66d9ef">void</span>)
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  byte <span style="color:#f92672">*</span>pbVar1;
+</span></span><span style="display:flex;"><span>  byte <span style="color:#f92672">*</span>pbVar2;
+</span></span><span style="display:flex;"><span>  byte bVar3;
+</span></span><span style="display:flex;"><span>  byte bVar4;
+</span></span><span style="display:flex;"><span>  byte bVar5;
+</span></span><span style="display:flex;"><span>  byte bVar6;
+</span></span><span style="display:flex;"><span>  byte bVar7;
+</span></span><span style="display:flex;"><span>  byte bVar8;
+</span></span><span style="display:flex;"><span>  byte bVar9;
+</span></span><span style="display:flex;"><span>  byte bVar10;
+</span></span><span style="display:flex;"><span>  byte bVar11;
+</span></span><span style="display:flex;"><span>  byte bVar12;
+</span></span><span style="display:flex;"><span>  byte bVar13;
+</span></span><span style="display:flex;"><span>  byte bVar14;
+</span></span><span style="display:flex;"><span>  byte bVar15;
+</span></span><span style="display:flex;"><span>  byte bVar16;
+</span></span><span style="display:flex;"><span>  byte bVar17;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">long</span> lVar18;
+</span></span><span style="display:flex;"><span>  ulong uVar19;
+</span></span><span style="display:flex;"><span>  ulong uVar20;
+</span></span><span style="display:flex;"><span>  byte bVar21;
+</span></span><span style="display:flex;"><span>  undefined uVar24;
+</span></span><span style="display:flex;"><span>  byte bVar25;
+</span></span><span style="display:flex;"><span>  byte bVar26;
+</span></span><span style="display:flex;"><span>  undefined uVar27;
+</span></span><span style="display:flex;"><span>  byte bVar28;
+</span></span><span style="display:flex;"><span>  byte bVar29;
+</span></span><span style="display:flex;"><span>  byte bVar30;
+</span></span><span style="display:flex;"><span>  byte bVar31;
+</span></span><span style="display:flex;"><span>  byte bVar32;
+</span></span><span style="display:flex;"><span>  byte bVar33;
+</span></span><span style="display:flex;"><span>  byte bVar34;
+</span></span><span style="display:flex;"><span>  byte bVar35;
+</span></span><span style="display:flex;"><span>  byte bVar36;
+</span></span><span style="display:flex;"><span>  byte bVar37;
+</span></span><span style="display:flex;"><span>  byte bVar38;
+</span></span><span style="display:flex;"><span>  byte bVar39;
+</span></span><span style="display:flex;"><span>  undefined auVar22 [<span style="color:#ae81ff">16</span>];
+</span></span><span style="display:flex;"><span>  undefined auVar23 [<span style="color:#ae81ff">16</span>];
+</span></span><span style="display:flex;"><span>  byte bVar40;
+</span></span><span style="display:flex;"><span>  undefined4 local_98;
+</span></span><span style="display:flex;"><span>  undefined4 uStack_94;
+</span></span><span style="display:flex;"><span>  undefined4 uStack_90;
+</span></span><span style="display:flex;"><span>  undefined4 uStack_8c;
+</span></span><span style="display:flex;"><span>  ulong local_88;
+</span></span><span style="display:flex;"><span>  undefined <span style="color:#f92672">**</span>local_80;
+</span></span><span style="display:flex;"><span>  undefined8 local_78;
+</span></span><span style="display:flex;"><span>  undefined <span style="color:#f92672">**</span>local_70;
+</span></span><span style="display:flex;"><span>  undefined8 local_68;
+</span></span><span style="display:flex;"><span>  undefined8 <span style="color:#f92672">*</span>local_60;
+</span></span><span style="display:flex;"><span>  undefined8 local_58;
+</span></span><span style="display:flex;"><span>  undefined8 local_50;
+</span></span><span style="display:flex;"><span>  undefined4 uStack_48;
+</span></span><span style="display:flex;"><span>  undefined4 uStack_44;
+</span></span><span style="display:flex;"><span>  ulong local_40;
+</span></span><span style="display:flex;"><span>  undefined8 local_38;
+</span></span><span style="display:flex;"><span>  undefined8 local_30;
+</span></span><span style="display:flex;"><span>  undefined8 local_28;
+</span></span><span style="display:flex;"><span>  undefined local_20;
+</span></span><span style="display:flex;"><span>  undefined4 <span style="color:#f92672">*</span>local_18;
+</span></span><span style="display:flex;"><span>  code <span style="color:#f92672">*</span>local_10;
+</span></span><span style="display:flex;"><span>  
+</span></span><span style="display:flex;"><span>  <span style="color:#75715e">// [TAG#0]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  <span style="color:#a6e22e">FUN_0011fb10</span>(<span style="color:#f92672">&amp;</span>local_50,<span style="color:#f92672">&amp;</span>DAT_00146480,<span style="color:#ae81ff">0xd</span>);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (local_50 <span style="color:#f92672">==</span> <span style="color:#f92672">-</span><span style="color:#ae81ff">0x8000000000000000</span>) {
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 0010882c to 00108850 has its CatchHandler @ 00108853 */</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">FUN_001082b0</span>(<span style="color:#f92672">&amp;</span>DAT_0014648d,<span style="color:#ae81ff">0x18</span>,<span style="color:#f92672">&amp;</span>local_80,<span style="color:#f92672">&amp;</span>PTR_FUN_00155320,<span style="color:#f92672">&amp;</span>PTR_DAT_00155340);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#a6e22e">invalidInstructionException</span>();
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">while</span>( true );
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  local_88 <span style="color:#f92672">=</span> local_40;
+</span></span><span style="display:flex;"><span>  local_98 <span style="color:#f92672">=</span> (undefined4)local_50;
+</span></span><span style="display:flex;"><span>  uStack_94 <span style="color:#f92672">=</span> local_50._4_4_;
+</span></span><span style="display:flex;"><span>  uStack_90 <span style="color:#f92672">=</span> uStack_48;
+</span></span><span style="display:flex;"><span>  uStack_8c <span style="color:#f92672">=</span> uStack_44;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (local_40 <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// [TAG#1]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    lVar18 <span style="color:#f92672">=</span> <span style="color:#a6e22e">CONCAT44</span>(uStack_44,uStack_48);
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (local_40 <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">8</span>) {
+</span></span><span style="display:flex;"><span>      uVar19 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">else</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (local_40 <span style="color:#f92672">&lt;</span> <span style="color:#ae81ff">0x10</span>) {
+</span></span><span style="display:flex;"><span>        uVar19 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>LAB_0010876f:
+</span></span><span style="display:flex;"><span>        uVar24 <span style="color:#f92672">=</span> (undefined)(uVar19 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">0x10</span>);
+</span></span><span style="display:flex;"><span>        uVar27 <span style="color:#f92672">=</span> (undefined)(uVar19 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">0x18</span>);
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">7</span>] <span style="color:#f92672">=</span> uVar27;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">6</span>] <span style="color:#f92672">=</span> uVar27;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">5</span>] <span style="color:#f92672">=</span> uVar24;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> uVar24;
+</span></span><span style="display:flex;"><span>        uVar24 <span style="color:#f92672">=</span> (undefined)(uVar19 <span style="color:#f92672">&gt;&gt;</span> <span style="color:#ae81ff">8</span>);
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> uVar24;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> uVar24;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> (undefined)uVar19;
+</span></span><span style="display:flex;"><span>        auVar22[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">0</span>];
+</span></span><span style="display:flex;"><span>        auVar22._8_8_ <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>        auVar22 <span style="color:#f92672">=</span> <span style="color:#a6e22e">pshuflw</span>(auVar22,auVar22,<span style="color:#ae81ff">0</span>);
+</span></span><span style="display:flex;"><span>        uVar20 <span style="color:#f92672">=</span> uVar19;
+</span></span><span style="display:flex;"><span>        auVar22 <span style="color:#f92672">=</span> auVar22 <span style="color:#f92672">|</span> _DAT_00146030;
+</span></span><span style="display:flex;"><span>        <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>          <span style="color:#f92672">*</span>(ulong <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar20) <span style="color:#f92672">=</span>
+</span></span><span style="display:flex;"><span>               <span style="color:#f92672">*</span>(ulong <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar20) <span style="color:#f92672">^</span> auVar22._0_8_ <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xdededededededede</span>;
+</span></span><span style="display:flex;"><span>          uVar20 <span style="color:#f92672">=</span> uVar20 <span style="color:#f92672">+</span> <span style="color:#ae81ff">8</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">0</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">5</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">5</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">6</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">6</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">7</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">7</span>] <span style="color:#f92672">+</span> <span style="color:#e6db74">&#39;\b&#39;</span>;
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">8</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">8</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">9</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">9</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">10</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">10</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">11</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">11</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">12</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">12</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">13</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">13</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">14</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">14</span>];
+</span></span><span style="display:flex;"><span>          auVar23[<span style="color:#ae81ff">15</span>] <span style="color:#f92672">=</span> auVar22[<span style="color:#ae81ff">15</span>];
+</span></span><span style="display:flex;"><span>          uVar19 <span style="color:#f92672">=</span> local_40 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xfffffffffffffff8</span>;
+</span></span><span style="display:flex;"><span>          auVar22 <span style="color:#f92672">=</span> auVar23;
+</span></span><span style="display:flex;"><span>          <span style="color:#66d9ef">if</span> ((local_40 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xfffffffffffffff8</span>) <span style="color:#f92672">==</span> uVar20) <span style="color:#66d9ef">goto</span> LAB_001088a6;
+</span></span><span style="display:flex;"><span>        } <span style="color:#66d9ef">while</span>( true );
+</span></span><span style="display:flex;"><span>      }
+</span></span><span style="display:flex;"><span>      uVar19 <span style="color:#f92672">=</span> local_40 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">0xfffffffffffffff0</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#75715e">// [TAG#3]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>      bVar21 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      bVar25 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>      bVar26 <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>      bVar28 <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>;
+</span></span><span style="display:flex;"><span>      bVar29 <span style="color:#f92672">=</span> <span style="color:#ae81ff">4</span>;
+</span></span><span style="display:flex;"><span>      bVar30 <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>;
+</span></span><span style="display:flex;"><span>      bVar31 <span style="color:#f92672">=</span> <span style="color:#ae81ff">6</span>;
+</span></span><span style="display:flex;"><span>      bVar32 <span style="color:#f92672">=</span> <span style="color:#ae81ff">7</span>;
+</span></span><span style="display:flex;"><span>      bVar33 <span style="color:#f92672">=</span> <span style="color:#ae81ff">8</span>;
+</span></span><span style="display:flex;"><span>      bVar34 <span style="color:#f92672">=</span> <span style="color:#ae81ff">9</span>;
+</span></span><span style="display:flex;"><span>      bVar35 <span style="color:#f92672">=</span> <span style="color:#ae81ff">10</span>;
+</span></span><span style="display:flex;"><span>      bVar36 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xb</span>;
+</span></span><span style="display:flex;"><span>      bVar37 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xc</span>;
+</span></span><span style="display:flex;"><span>      bVar38 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xd</span>;
+</span></span><span style="display:flex;"><span>      bVar39 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xe</span>;
+</span></span><span style="display:flex;"><span>      bVar40 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0xf</span>;
+</span></span><span style="display:flex;"><span>      uVar20 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>        pbVar1 <span style="color:#f92672">=</span> (byte <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar20);
+</span></span><span style="display:flex;"><span>        bVar3 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">1</span>];
+</span></span><span style="display:flex;"><span>        bVar4 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">2</span>];
+</span></span><span style="display:flex;"><span>        bVar5 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">3</span>];
+</span></span><span style="display:flex;"><span>        bVar6 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">4</span>];
+</span></span><span style="display:flex;"><span>        bVar7 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">5</span>];
+</span></span><span style="display:flex;"><span>        bVar8 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">6</span>];
+</span></span><span style="display:flex;"><span>        bVar9 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">7</span>];
+</span></span><span style="display:flex;"><span>        bVar10 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">8</span>];
+</span></span><span style="display:flex;"><span>        bVar11 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">9</span>];
+</span></span><span style="display:flex;"><span>        bVar12 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">10</span>];
+</span></span><span style="display:flex;"><span>        bVar13 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">0xb</span>];
+</span></span><span style="display:flex;"><span>        bVar14 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">0xc</span>];
+</span></span><span style="display:flex;"><span>        bVar15 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">0xd</span>];
+</span></span><span style="display:flex;"><span>        bVar16 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">0xe</span>];
+</span></span><span style="display:flex;"><span>        bVar17 <span style="color:#f92672">=</span> pbVar1[<span style="color:#ae81ff">0xf</span>];
+</span></span><span style="display:flex;"><span>        pbVar2 <span style="color:#f92672">=</span> (byte <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar20);
+</span></span><span style="display:flex;"><span>        <span style="color:#f92672">*</span>pbVar2 <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>pbVar1 <span style="color:#f92672">^</span> bVar21 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">1</span>] <span style="color:#f92672">=</span> bVar3 <span style="color:#f92672">^</span> bVar25 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">2</span>] <span style="color:#f92672">=</span> bVar4 <span style="color:#f92672">^</span> bVar26 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">3</span>] <span style="color:#f92672">=</span> bVar5 <span style="color:#f92672">^</span> bVar28 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">4</span>] <span style="color:#f92672">=</span> bVar6 <span style="color:#f92672">^</span> bVar29 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">5</span>] <span style="color:#f92672">=</span> bVar7 <span style="color:#f92672">^</span> bVar30 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">6</span>] <span style="color:#f92672">=</span> bVar8 <span style="color:#f92672">^</span> bVar31 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">7</span>] <span style="color:#f92672">=</span> bVar9 <span style="color:#f92672">^</span> bVar32 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">8</span>] <span style="color:#f92672">=</span> bVar10 <span style="color:#f92672">^</span> bVar33 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">9</span>] <span style="color:#f92672">=</span> bVar11 <span style="color:#f92672">^</span> bVar34 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">10</span>] <span style="color:#f92672">=</span> bVar12 <span style="color:#f92672">^</span> bVar35 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">0xb</span>] <span style="color:#f92672">=</span> bVar13 <span style="color:#f92672">^</span> bVar36 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">0xc</span>] <span style="color:#f92672">=</span> bVar14 <span style="color:#f92672">^</span> bVar37 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">0xd</span>] <span style="color:#f92672">=</span> bVar15 <span style="color:#f92672">^</span> bVar38 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">0xe</span>] <span style="color:#f92672">=</span> bVar16 <span style="color:#f92672">^</span> bVar39 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        pbVar2[<span style="color:#ae81ff">0xf</span>] <span style="color:#f92672">=</span> bVar17 <span style="color:#f92672">^</span> bVar40 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>        <span style="color:#75715e">// [TAG#4]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        uVar20 <span style="color:#f92672">=</span> uVar20 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar21 <span style="color:#f92672">=</span> bVar21 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar25 <span style="color:#f92672">=</span> bVar25 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar26 <span style="color:#f92672">=</span> bVar26 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar28 <span style="color:#f92672">=</span> bVar28 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar29 <span style="color:#f92672">=</span> bVar29 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar30 <span style="color:#f92672">=</span> bVar30 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar31 <span style="color:#f92672">=</span> bVar31 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar32 <span style="color:#f92672">=</span> bVar32 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar33 <span style="color:#f92672">=</span> bVar33 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar34 <span style="color:#f92672">=</span> bVar34 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar35 <span style="color:#f92672">=</span> bVar35 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar36 <span style="color:#f92672">=</span> bVar36 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar37 <span style="color:#f92672">=</span> bVar37 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar38 <span style="color:#f92672">=</span> bVar38 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar39 <span style="color:#f92672">=</span> bVar39 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>        bVar40 <span style="color:#f92672">=</span> bVar40 <span style="color:#f92672">+</span> <span style="color:#ae81ff">0x10</span>;
+</span></span><span style="display:flex;"><span>      } <span style="color:#66d9ef">while</span> (uVar19 <span style="color:#f92672">!=</span> uVar20);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> (local_40 <span style="color:#f92672">==</span> uVar19) <span style="color:#66d9ef">goto</span> LAB_001088ab;
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">if</span> ((local_40 <span style="color:#f92672">&amp;</span> <span style="color:#ae81ff">8</span>) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) <span style="color:#66d9ef">goto</span> LAB_0010876f;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">// [TAG#2]
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    <span style="color:#66d9ef">do</span> {
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">*</span>(byte <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar19) <span style="color:#f92672">=</span> <span style="color:#f92672">*</span>(byte <span style="color:#f92672">*</span>)(lVar18 <span style="color:#f92672">+</span> uVar19) <span style="color:#f92672">^</span> (byte)uVar19 <span style="color:#f92672">^</span> <span style="color:#ae81ff">0xde</span>;
+</span></span><span style="display:flex;"><span>      uVar19 <span style="color:#f92672">=</span> uVar19 <span style="color:#f92672">+</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>LAB_001088a6:
+</span></span><span style="display:flex;"><span>    } <span style="color:#66d9ef">while</span> (local_40 <span style="color:#f92672">!=</span> uVar19);
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>LAB_001088ab:
+</span></span><span style="display:flex;"><span>  local_10 <span style="color:#f92672">=</span> FUN_00108680;
+</span></span><span style="display:flex;"><span>  local_50 <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>  local_40 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  local_38 <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>  local_30 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>  local_28 <span style="color:#f92672">=</span> <span style="color:#ae81ff">0x1800000020</span>;
+</span></span><span style="display:flex;"><span>  local_20 <span style="color:#f92672">=</span> <span style="color:#ae81ff">3</span>;
+</span></span><span style="display:flex;"><span>  local_80 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>PTR_DAT_00155358;
+</span></span><span style="display:flex;"><span>  local_78 <span style="color:#f92672">=</span> <span style="color:#ae81ff">2</span>;
+</span></span><span style="display:flex;"><span>  local_58 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>  local_70 <span style="color:#f92672">=</span> (undefined <span style="color:#f92672">**</span>)<span style="color:#f92672">&amp;</span>local_18;
+</span></span><span style="display:flex;"><span>  local_68 <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex;"><span>                    <span style="color:#75715e">/* try { // try from 00108936 to 00108940 has its CatchHandler @ 00108870 */</span>
+</span></span><span style="display:flex;"><span>  local_60 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_50;
+</span></span><span style="display:flex;"><span>  local_18 <span style="color:#f92672">=</span> <span style="color:#f92672">&amp;</span>local_98;
+</span></span><span style="display:flex;"><span>  <span style="color:#a6e22e">FUN_001210a0</span>(<span style="color:#f92672">&amp;</span>local_80);
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">if</span> (<span style="color:#a6e22e">CONCAT44</span>(uStack_94,local_98) <span style="color:#f92672">!=</span> <span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>    <span style="color:#a6e22e">free</span>((<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>)<span style="color:#a6e22e">CONCAT44</span>(uStack_8c,uStack_90));
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Clearly, the logic of the iterator was compiled as a loop once more.</p>
+<p>At <code>[TAG#0]</code> the second parameter is the string <code>plaintext.txt</code> - this file is read as a <code>Vec&lt;u8&gt;</code> to <code>local_50</code>. A vector&rsquo;s memory layout should look roughly like this:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-rust" data-lang="rust"><span style="display:flex;"><span><span style="color:#66d9ef">struct</span> Vec<span style="color:#f92672">&lt;</span>T<span style="color:#f92672">&gt;</span> {
+</span></span><span style="display:flex;"><span>    ptr: <span style="color:#f92672">*</span><span style="color:#66d9ef">mut</span> T,
+</span></span><span style="display:flex;"><span>    len: <span style="color:#66d9ef">usize</span>,
+</span></span><span style="display:flex;"><span>    cap: <span style="color:#66d9ef">usize</span>,
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>However, we&rsquo;ll see that the layout is actually different in the code above. From the context, we can see that <code>local_40</code> seems to be the vector size. Also from the context, <code>lVar18</code> is a pointer to the vector data (<code>[TAG#1]</code>).</p>
+<p>The easiest way to find out what is being calculated, is by refering to the case <code>local_40 &lt; 0x10</code>. If this is the case, we end up at <code>[TAG#2]</code>. Easy to see.</p>
+<p>The other cases are if the size is less than 16, and especially when the size is greater or equal to 16. Here, we have the counter values defined at <code>[TAG#3]</code> and incremented at <code>[TAG#4]</code>, with data processed in blocks of 16 bytes.</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>As we were able to determine, debug builds and release builds are vastly different. Debug builds feature multiple nested functions in the case of iterators. Here, we just started digging until we reached the bottom. A basic understanding of Rust and functional programming helped us get a better grasp of what is going on. I don&rsquo;t see a shortcut when it comes to reversing the iterators in the debug build. However, for release builds, where to iterators are converted to loops, it seems going for the cases <code>length &lt; 8</code> simplifies things, at least with regards to the simple XOR encryption we were analyzing. I&rsquo;m probably going to do more of these posts, so stay tuned.</p>
+<h1 id="acknowledgements">Acknowledgements</h1>
+<p>Thanks to @cxiao for reading this and giving me feedback :)</p>
+<h1 id="references">References</h1>
+<p>[1] johnthagen <a href="https://github.com/johnthagen/min-sized-rust?tab=readme-ov-file#strip-symbols-from-binary">min-sized-rust</a></p>
+<p>[2] rust slices <a href="https://doc.rust-lang.org/book/ch04-03-slices.html">in the rust book</a></p>
+<p>[3] <a href="https://wiki.tcl-lang.org/page/Fold+in+functional+programming">fold</a> in functional programming</p>
+<p>[4] <a href="https://doc.rust-lang.org/beta/std/iter/trait.Iterator.html#method.fold">fold method in Iterator</a></p>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+

@@ -2,91 +2,81 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Mws on 0xca7</title>
-    <link>https://0xca7.github.io/mw/</link>
+    <link>http://localhost:1313/mw/</link>
     <description>Recent content in Mws on 0xca7</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 01 Jan 2024 10:00:43 +0100</lastBuildDate><atom:link href="https://0xca7.github.io/mw/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 11 May 2024 13:45:19 +0200</lastBuildDate>
+    <atom:link href="http://localhost:1313/mw/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Latrodectus</title>
+      <link>http://localhost:1313/mw/latrodectus/</link>
+      <pubDate>Sat, 11 May 2024 13:45:19 +0200</pubDate>
+      <guid>http://localhost:1313/mw/latrodectus/</guid>
+      <description>Sample: SHA256 805b59e48af90504024f70124d850870a69b822b8e34d1ee551353c42a338bf7&#xA;API Hashing The malware uses API hashing to hide imported API functions. The hash function used is CRC32:&#xA;/* address: 0x180006aa4 */ uint64_t uc_crc32(int64_t a_name, int32_t a_namelen) { if (data_180011318 == 0) { for (uint32_t i = 0; i &amp;lt; 0x100; i = (i + 1)) { uint32_t i_2 = i; for (int32_t j = 8; j &amp;gt; 0; j = (j - 1)) { if ((i_2 &amp;amp; 1) == 0) { i_2 = (i_2 &amp;gt;&amp;gt; 1); } else { i_2 = ((i_2 &amp;gt;&amp;gt; 1) ^ 0xedb88320); } } *(uint32_t*)(&amp;amp;data_180010f18 + (((uint64_t)i) &amp;lt;&amp;lt; 2)) = i_2; } data_180011318 = 1; } int32_t var_10 = 0xffffffff; for (int32_t i_1 = 0; i_1 &amp;lt; a_namelen; i_1 = (i_1 + 1)) { var_10 = ((var_10 &amp;gt;&amp;gt; 8) ^ *(uint32_t*)(&amp;amp;data_180010f18 + (((uint64_t)(*(uint8_t*)(a_name + ((uint64_t)i_1)) ^ var_10)) &amp;lt;&amp;lt; 2))); } return ((uint64_t)!</description>
+    </item>
+    <item>
+      <title>Wineloader</title>
+      <link>http://localhost:1313/mw/wineloader/</link>
+      <pubDate>Sat, 16 Mar 2024 10:27:33 +0000</pubDate>
+      <guid>http://localhost:1313/mw/wineloader/</guid>
+      <description>SHA256: 72b92683052e0c813890caf7b4f8bfd331a8b2afc324dd545d46138f677178c4&#xA;Resources: [1] https://www.zscaler.com/blogs/security-research/european-diplomats-targeted-spikedwine-wineloader&#xA;Summary The article in the resources above contains all the important information about the sample.&#xA;Goals:&#xA;find the C2 URL, just to have fun.&#xA;These analysis notes add to the zscaler report [1] by showing how to reach a subset of the presented conclusions and supply code snippets to help with analysis. Specifically, the means to statically decrypt the main payload of the sample are given, as well as a means for decrypting strings and the C2 URL used by the malware.</description>
+    </item>
     <item>
       <title>Battling with APT malware</title>
-      <link>https://0xca7.github.io/mw/ca7vsapt/</link>
+      <link>http://localhost:1313/mw/ca7vsapt/</link>
       <pubDate>Mon, 01 Jan 2024 10:00:43 +0100</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/ca7vsapt/</guid>
-      <description>When I read malware analysis reports, I try to replicate them. That means I skim the report, if the malware is interesting, I get a sample and dig into it. When I get stuck, I go back to the report for help. I came across an interesting analysis of an APT malware: https://asec.ahnlab.com/en/57684/.
-As a target I decided to look at the dropper component:
-MD5: 1ecd83ee7e4cfc8fed7ceb998e75b996 SHA256: eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5 The report covers a lot of ground and explains the workings of the malware perfectly.</description>
+      <guid>http://localhost:1313/mw/ca7vsapt/</guid>
+      <description>When I read malware analysis reports, I try to replicate them. That means I skim the report, if the malware is interesting, I get a sample and dig into it. When I get stuck, I go back to the report for help. I came across an interesting analysis of an APT malware: https://asec.ahnlab.com/en/57684/.&#xA;As a target I decided to look at the dropper component:&#xA;MD5: 1ecd83ee7e4cfc8fed7ceb998e75b996 SHA256: eff3e37d0406c818e3430068d90e7ed2f594faa6bb146ab0a1c00a2f4a4809a5 The report covers a lot of ground and explains the workings of the malware perfectly.</description>
     </item>
-    
     <item>
       <title>Notes on PEB Walking</title>
-      <link>https://0xca7.github.io/mw/pebwalk_notes/</link>
+      <link>http://localhost:1313/mw/pebwalk_notes/</link>
       <pubDate>Tue, 17 Oct 2023 19:11:03 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/pebwalk_notes/</guid>
-      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader
-As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
+      <guid>http://localhost:1313/mw/pebwalk_notes/</guid>
+      <description>This is more a note than it is a blog post. Recently, I followed this report about a malware named BLISTER, a current loader. This malware features a walk of the Process Environment Block (PEB) and API hashing to eventually load the functions necessary for its operation from ntdll. I followed this report: https://www.elastic.co/security-labs/blister-loader&#xA;As I found the report to be excellent, I aimed to replicate the findings to learn / get better at reversing.</description>
     </item>
-    
     <item>
       <title>Stop/DJVU Analysis</title>
-      <link>https://0xca7.github.io/mw/stop_djvu/</link>
+      <link>http://localhost:1313/mw/stop_djvu/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:46 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/stop_djvu/</guid>
+      <guid>http://localhost:1313/mw/stop_djvu/</guid>
       <description>Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
     </item>
-    
     <item>
       <title>Linux Botnet Analysis</title>
-      <link>https://0xca7.github.io/mw/linux_botnet/</link>
+      <link>http://localhost:1313/mw/linux_botnet/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:40 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/linux_botnet/</guid>
+      <guid>http://localhost:1313/mw/linux_botnet/</guid>
       <description>Analysis of a botnet malware targeting Linux systems Linux Botnet</description>
     </item>
-    
     <item>
       <title>Golang Stealer</title>
-      <link>https://0xca7.github.io/mw/golang_stealer/</link>
+      <link>http://localhost:1313/mw/golang_stealer/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:34 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/golang_stealer/</guid>
+      <guid>http://localhost:1313/mw/golang_stealer/</guid>
       <description>Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer</description>
     </item>
-    
     <item>
       <title>Redline Stealer Analysis</title>
-      <link>https://0xca7.github.io/mw/redline/</link>
+      <link>http://localhost:1313/mw/redline/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:29 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/redline/</guid>
+      <guid>http://localhost:1313/mw/redline/</guid>
       <description>Analysis of the famous Redline stealer Redline Stealer</description>
     </item>
-    
     <item>
       <title>Blackguard</title>
-      <link>https://0xca7.github.io/mw/blackguard/</link>
+      <link>http://localhost:1313/mw/blackguard/</link>
       <pubDate>Sat, 03 Sep 2022 09:52:24 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/blackguard/</guid>
-      <description>get the Blackguard stealer analysis from my old site here as a pdf:
-Analysis of a .NET infostealer Blackguard Stealer</description>
+      <guid>http://localhost:1313/mw/blackguard/</guid>
+      <description>get the Blackguard stealer analysis from my old site here as a pdf:&#xA;Analysis of a .NET infostealer Blackguard Stealer</description>
     </item>
-    
     <item>
       <title>Collection of Malware Analysis Writeups</title>
-      <link>https://0xca7.github.io/mw/malware_analysis/</link>
+      <link>http://localhost:1313/mw/malware_analysis/</link>
       <pubDate>Fri, 26 Aug 2022 15:46:59 +0200</pubDate>
-      
-      <guid>https://0xca7.github.io/mw/malware_analysis/</guid>
-      <description>All of the files below are PDFs, they have been saved as such from my old site.
-Analysis of a .NET infostealer Blackguard Stealer
-Analysis of the famous Redline stealer Redline Stealer
-Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer
-Analysis of a botnet malware targeting Linux systems Linux Botnet
-Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
+      <guid>http://localhost:1313/mw/malware_analysis/</guid>
+      <description>All of the files below are PDFs, they have been saved as such from my old site.&#xA;Analysis of a .NET infostealer Blackguard Stealer&#xA;Analysis of the famous Redline stealer Redline Stealer&#xA;Analysis of a stealer targeting Linux Systems, written in Go Golang Stealer&#xA;Analysis of a botnet malware targeting Linux systems Linux Botnet&#xA;Unpacking of the STOP/DJVU Ransomware, contains stealer malware STOP/DJVU Unpacking</description>
     </item>
-    
   </channel>
 </rss>
