@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bggp5 | 0xca7</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/fonts.css" />
+    
+  </head>
+
+  <body>
+    <nav>
+    <ul class="menu">
+      
+      <li><a href="/">Home</a></li>
+      
+      <li><a href="/mw">Malware</a></li>
+      
+      <li><a href="/posts">Blog</a></li>
+      
+      <li><a href="/notes">Notes</a></li>
+      
+      <li><a href="https://github.com/0xca7">Github</a></li>
+      
+      <li><a href="https://www.youtube.com/channel/UCYKUCM--rF5yC0c1a1rTgBQ">Youtube</a></li>
+      
+    </ul>
+    <hr/>
+    </nav>
+
+<div class="article-meta">
+<h1><span class="title">Bggp5</span></h1>
+
+<h2 class="date">2024/06/23</h2>
+</div>
+
+<main>
+<p>This year&rsquo;s Binary Golf Grand Prix (BGGP5) states the following goal:</p>
+<p><em>Create the smallest file that downloads [LINK] text file and displays its contents.</em></p>
+<p>Instead of an actual compiled program, I thought I&rsquo;d go for something a little bit more obscure. A Downloader using the build system <code>cmake</code>!</p>
+<p>I&rsquo;m using Linux, so to install the build system run:</p>
+<pre tabindex="0"><code>sudo apt install cmake
+</code></pre><p>This is the version I am running:</p>
+<pre tabindex="0"><code>$ cmake --version
+cmake version 3.28.3
+</code></pre><p>&hellip; and here&rsquo;s the downloader:</p>
+<pre tabindex="0"><code>cmake_minimum_required(VERSION 3.28)
+include(FetchContent)
+FetchContent_Declare(b URL https://binary.golf/5/5 DOWNLOAD_NO_EXTRACT TRUE)
+FetchContent_MakeAvailable(b)
+execute_process (COMMAND bash -c &#34;cat _deps/b-subbuild/b-populate-prefix/src/5&#34; OUTPUT_VARIABLE o)
+MESSAGE(INFO ${o})
+</code></pre><p>All this does is fetch the downloader from the URL specified in the challenge and then execute the <code>cat</code> bash command to print the downloaded file&rsquo;s content to stdout. You can use this script for testing my entry:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e">#!/bin/bash
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>
+</span></span><span style="display:flex;"><span>rm -rf build
+</span></span><span style="display:flex;"><span>mkdir build ; cd build
+</span></span><span style="display:flex;"><span>cmake ..
+</span></span></code></pre></div><p>Running the shell script, which in turn just sets up a directory and runs cmake, yields the following output:</p>
+<pre tabindex="0"><code>CMake Warning (dev) in CMakeLists.txt:
+  No project() command is present.  The top-level CMakeLists.txt file must
+  contain a literal, direct call to the project() command.  Add a line of
+  code such as
+
+    project(ProjectName)
+
+  near the top of the file, but after cmake_minimum_required().
+
+  CMake is pretending there is a &#34;project(Project)&#34; command on the first
+  line.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) in CMakeLists.txt:
+  cmake_minimum_required() should be called prior to this top-level project()
+  call.  Please see the cmake-commands(7) manual for usage documentation of
+  both commands.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- The C compiler identification is GNU 13.2.0
+-- The CXX compiler identification is GNU 13.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+INFOAnother #BGGP5 download!! @binarygolf https://binary.golf
+
+-- Configuring done (1.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/nmt/work/hacking/bggp/cmake-downloader/build
+</code></pre><p>Note that the file&rsquo;s contents are printed in the line starting with <code>INFO</code>.</p>
+<p>Here&rsquo;s the SHA256 of my entry, the CMakeLists.txt has <code>283</code> bytes.</p>
+<pre tabindex="0"><code>SHA256: 27a46761d80b58565970b941d2f0e8f26626e4b3756705a0d121bb8271c0a0f2  
+</code></pre><h3 id="0xca7">0xca7</h3>
+
+</main>
+
+  <footer>
+  
+  
+  </footer>
+  </body>
+</html>
+
